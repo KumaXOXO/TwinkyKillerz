@@ -1,0 +1,133 @@
+import { Room, Client } from "@colyseus/core"
+import { GameState, PlayerState, CheatEvent } from "../../../shared/schema"
+import {
+  CHEAT_WINDOW_MS,
+  MAX_ROUNDS,
+  SCORE_CHEAT_CAUGHT,
+  SCORE_CHEAT_SUCCESS,
+  MINIGAMES,
+} from "../../../shared/constants"
+
+interface JoinOptions {
+  name: string
+  characterId: string
+}
+
+interface CheatAttemptMsg {
+  cheatType: string
+}
+
+interface CatchCheatMsg {
+  targetId: string
+}
+
+export class GameRoom extends Room<GameState> {
+  maxClients = 4
+  private readyPlayers = new Set<string>()
+
+  // Override to guard against mock clocks in tests that lack a start() method
+  setState(newState: GameState) {
+    if (typeof (this.clock as any).start !== "function") {
+      // Patch the mock clock temporarily so the parent's setState can run fully
+      ;(this.clock as any).start = () => {}
+    }
+    super.setState(newState)
+  }
+
+  onCreate(_options: unknown) {
+    this.setState(new GameState())
+    this.onMessage("player_ready", (client, msg) => this.handlePlayerReady(client, msg))
+    this.onMessage("cheat_attempt", (client, msg: CheatAttemptMsg) =>
+      this.handleCheatAttempt(client, msg)
+    )
+    this.onMessage("catch_cheat", (client, msg: CatchCheatMsg) =>
+      this.handleCatchCheat(client, msg)
+    )
+  }
+
+  onJoin(client: Client, options: JoinOptions) {
+    const player = new PlayerState()
+    player.id = client.sessionId
+    player.name = options.name ?? "Player"
+    player.characterId = options.characterId ?? "default"
+    this.state.players.set(client.sessionId, player)
+  }
+
+  onLeave(client: Client, _consented: boolean) {
+    const player = this.state.players.get(client.sessionId)
+    if (player) player.isConnected = false
+    this.readyPlayers.delete(client.sessionId)
+  }
+
+  onDispose() {}
+
+  handlePlayerReady(client: Client, _msg: unknown) {
+    this.readyPlayers.add(client.sessionId)
+    const connectedIds = [...this.state.players.values()]
+      .filter((p) => p.isConnected)
+      .map((p) => p.id)
+    const allReady =
+      connectedIds.length >= 2 && connectedIds.every((id) => this.readyPlayers.has(id))
+    if (allReady) {
+      this.readyPlayers.clear()
+      this.startNewRound()
+    }
+  }
+
+  handleCheatAttempt(client: Client, msg: CheatAttemptMsg) {
+    const player = this.state.players.get(client.sessionId)
+    if (!player || player.isCheating) return
+    player.isCheating = true
+    player.cheatStartTimestamp = Date.now()
+
+    this.clock.setTimeout(() => {
+      if (player.isCheating) this.resolveCheat(client.sessionId, false)
+    }, CHEAT_WINDOW_MS)
+  }
+
+  handleCatchCheat(client: Client, msg: CatchCheatMsg) {
+    const target = this.state.players.get(msg.targetId)
+    if (!target || !target.isCheating) return
+    if (Date.now() - target.cheatStartTimestamp > CHEAT_WINDOW_MS) return
+    this.resolveCheat(msg.targetId, true)
+    this.broadcast("cheat_caught", { catcherId: client.sessionId, targetId: msg.targetId })
+  }
+
+  startNewRound() {
+    this.state.currentRound++
+    if (this.state.currentRound > MAX_ROUNDS) {
+      this.state.phase = "gameover"
+      return
+    }
+    this.state.phase = "wheel"
+    const ids = [...this.state.players.keys()]
+    if (!this.state.wheelSpinnerId || !ids.includes(this.state.wheelSpinnerId)) {
+      this.state.wheelSpinnerId = ids[Math.floor(Math.random() * ids.length)]
+    }
+    this.state.currentMinigame = MINIGAMES[Math.floor(Math.random() * MINIGAMES.length)]
+    this.broadcast("round_started", {
+      round: this.state.currentRound,
+      spinnerId: this.state.wheelSpinnerId,
+    })
+  }
+
+  private resolveCheat(playerId: string, caught: boolean) {
+    const player = this.state.players.get(playerId)
+    if (!player) return
+    player.isCheating = false
+    player.cheatStartTimestamp = 0
+
+    const event = new CheatEvent()
+    event.playerId = playerId
+    event.caught = caught
+    event.startTimestamp = Date.now()
+    this.state.cheatLog.push(event)
+
+    if (caught) {
+      player.score = Math.max(0, player.score + SCORE_CHEAT_CAUGHT)
+    } else {
+      player.score += SCORE_CHEAT_SUCCESS
+      this.broadcast("cheat_succeeded", { playerId })
+    }
+  }
+}
