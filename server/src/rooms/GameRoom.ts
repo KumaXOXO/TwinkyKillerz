@@ -24,15 +24,7 @@ interface CatchCheatMsg {
 export class GameRoom extends Room<GameState> {
   maxClients = 4
   private readyPlayers = new Set<string>()
-
-  // Override to guard against mock clocks in tests that lack a start() method
-  setState(newState: GameState) {
-    if (typeof (this.clock as any).start !== "function") {
-      // Patch the mock clock temporarily so the parent's setState can run fully
-      ;(this.clock as any).start = () => {}
-    }
-    super.setState(newState)
-  }
+  private pendingCheatTypes = new Map<string, string>()
 
   onCreate(_options: unknown) {
     this.setState(new GameState())
@@ -61,7 +53,7 @@ export class GameRoom extends Room<GameState> {
 
   onDispose() {}
 
-  handlePlayerReady(client: Client, _msg: unknown) {
+  private handlePlayerReady(client: Client, _msg: unknown) {
     this.readyPlayers.add(client.sessionId)
     const connectedIds = [...this.state.players.values()]
       .filter((p) => p.isConnected)
@@ -74,26 +66,28 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  handleCheatAttempt(client: Client, msg: CheatAttemptMsg) {
+  private handleCheatAttempt(client: Client, msg: CheatAttemptMsg) {
     const player = this.state.players.get(client.sessionId)
     if (!player || player.isCheating) return
     player.isCheating = true
     player.cheatStartTimestamp = Date.now()
+    this.pendingCheatTypes.set(client.sessionId, msg.cheatType)
 
     this.clock.setTimeout(() => {
-      if (player.isCheating) this.resolveCheat(client.sessionId, false)
+      if (player.isCheating) this.resolveCheat(client.sessionId, false, msg.cheatType)
     }, CHEAT_WINDOW_MS)
   }
 
-  handleCatchCheat(client: Client, msg: CatchCheatMsg) {
+  private handleCatchCheat(client: Client, msg: CatchCheatMsg) {
     const target = this.state.players.get(msg.targetId)
     if (!target || !target.isCheating) return
     if (Date.now() - target.cheatStartTimestamp > CHEAT_WINDOW_MS) return
-    this.resolveCheat(msg.targetId, true)
+    const cheatType = this.pendingCheatTypes.get(msg.targetId) ?? ""
+    this.resolveCheat(msg.targetId, true, cheatType)
     this.broadcast("cheat_caught", { catcherId: client.sessionId, targetId: msg.targetId })
   }
 
-  startNewRound() {
+  private startNewRound() {
     this.state.currentRound++
     if (this.state.currentRound > MAX_ROUNDS) {
       this.state.phase = "gameover"
@@ -111,7 +105,7 @@ export class GameRoom extends Room<GameState> {
     })
   }
 
-  private resolveCheat(playerId: string, caught: boolean) {
+  private resolveCheat(playerId: string, caught: boolean, cheatType: string) {
     const player = this.state.players.get(playerId)
     if (!player) return
     player.isCheating = false
@@ -120,8 +114,10 @@ export class GameRoom extends Room<GameState> {
     const event = new CheatEvent()
     event.playerId = playerId
     event.caught = caught
+    event.cheatType = cheatType
     event.startTimestamp = Date.now()
     this.state.cheatLog.push(event)
+    this.pendingCheatTypes.delete(playerId)
 
     if (caught) {
       player.score = Math.max(0, player.score + SCORE_CHEAT_CAUGHT)

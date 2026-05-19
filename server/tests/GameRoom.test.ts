@@ -6,7 +6,7 @@ function makeRoom() {
   const room = new GameRoom()
   room.roomId = "test"
   // @ts-ignore
-  room.clock = { setTimeout: (fn: () => void, _ms: number) => fn }
+  room.clock = { setTimeout: (fn: () => void, _ms: number) => fn, start: () => {} } as any
   // @ts-ignore
   room.broadcast = vi.fn()
   room.onCreate({})
