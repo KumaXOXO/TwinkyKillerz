@@ -119,7 +119,7 @@ export class GameRoom extends Room<GameState> {
   private handleWheelDone(client: Client, _msg: unknown) {
     if (client.sessionId !== this.state.wheelSpinnerId) return
     if (this.state.phase !== "wheel") return
-    const minSpinMs = (WHEEL_MIN_VELOCITY / WHEEL_BASE_DECEL) * 1000
+    const minSpinMs = (this.state.wheelVelocity / WHEEL_BASE_DECEL) * 1000
     if (Date.now() - this.wheelSpinStartTime < minSpinMs) return
     this.state.phase = "minigame"
   }

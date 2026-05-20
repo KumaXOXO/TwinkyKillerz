@@ -168,9 +168,9 @@ describe("GameRoom wheel mechanics", () => {
     room["handlePlayerReady"](c2, {})
     expect(room.state.phase).toBe("wheel")
 
-    // Advance time past the minimum spin duration
+    // Advance time past the maximum possible spin duration
     const origNow = Date.now
-    Date.now = () => origNow() + 4000
+    Date.now = () => origNow() + 7000
 
     const spinnerClient = room.state.wheelSpinnerId === c1.sessionId ? c1 : c2
     room["handleWheelDone"](spinnerClient, {})

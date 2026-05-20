@@ -16,6 +16,7 @@ export class WheelScene extends Phaser.Scene {
   private isSpinning = false
   private isDone = false
   private stateChangeCallback: ((state: GameState) => void) | null = null
+  private spaceHandler: (() => void) | null = null
 
   constructor() {
     super({ key: "WheelScene" })
@@ -72,13 +73,14 @@ export class WheelScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys()
 
     if (isSpinner) {
-      this.input.keyboard!.once("keydown-SPACE", () => {
+      this.spaceHandler = () => {
         const v = this.room.state.wheelVelocity
         if (v <= 0) return
         this.velocity = v
         this.isSpinning = true
         statusText.setText("Left/right arrows to influence")
-      })
+      }
+      this.input.keyboard!.once("keydown-SPACE", this.spaceHandler)
     }
 
     this.stateChangeCallback = (state) => {
@@ -126,6 +128,10 @@ export class WheelScene extends Phaser.Scene {
     if (this.stateChangeCallback) {
       this.room.onStateChange.remove(this.stateChangeCallback)
       this.stateChangeCallback = null
+    }
+    if (this.spaceHandler) {
+      this.input.keyboard?.removeListener("keydown-SPACE", this.spaceHandler)
+      this.spaceHandler = null
     }
   }
 
