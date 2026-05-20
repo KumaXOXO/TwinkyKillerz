@@ -15,6 +15,7 @@ export class WheelScene extends Phaser.Scene {
   private decelMult = 1.0
   private isSpinning = false
   private isDone = false
+  private stateChangeCallback: ((state: GameState) => void) | null = null
 
   constructor() {
     super({ key: "WheelScene" })
@@ -72,21 +73,27 @@ export class WheelScene extends Phaser.Scene {
 
     if (isSpinner) {
       this.input.keyboard!.once("keydown-SPACE", () => {
-        this.velocity = this.room.state.wheelVelocity
+        const v = this.room.state.wheelVelocity
+        if (v <= 0) return
+        this.velocity = v
         this.isSpinning = true
         statusText.setText("Left/right arrows to influence")
       })
     }
 
-    const unsubscribe = this.room.onStateChange((state) => {
+    this.stateChangeCallback = (state) => {
       if (state.phase === "minigame") {
-        unsubscribe()
+        if (this.stateChangeCallback) {
+          this.room.onStateChange.remove(this.stateChangeCallback)
+          this.stateChangeCallback = null
+        }
         resultText.setText(`Next: ${state.currentMinigame.toUpperCase()}!`)
         this.time.delayedCall(500, () => {
           this.scene.start("ChessScene", { room: this.room })
         })
       }
-    })
+    }
+    this.room.onStateChange(this.stateChangeCallback)
   }
 
   update(_time: number, delta: number) {
@@ -112,6 +119,13 @@ export class WheelScene extends Phaser.Scene {
     if (this.velocity <= 0) {
       this.isDone = true
       this.onWheelStopped()
+    }
+  }
+
+  shutdown() {
+    if (this.stateChangeCallback) {
+      this.room.onStateChange.remove(this.stateChangeCallback)
+      this.stateChangeCallback = null
     }
   }
 
