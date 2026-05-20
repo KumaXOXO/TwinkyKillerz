@@ -74,7 +74,10 @@ export class GameRoom extends Room<GameState> {
     this.pendingCheatTypes.set(client.sessionId, msg.cheatType)
 
     this.clock.setTimeout(() => {
-      if (player.isCheating) this.resolveCheat(client.sessionId, false, msg.cheatType)
+      if (player.isCheating) {
+        const cheatType = this.pendingCheatTypes.get(client.sessionId) ?? ""
+        this.resolveCheat(client.sessionId, false, cheatType)
+      }
     }, CHEAT_WINDOW_MS)
   }
 
@@ -95,9 +98,9 @@ export class GameRoom extends Room<GameState> {
     }
     this.state.phase = "wheel"
     const ids = [...this.state.players.keys()]
-    if (!this.state.wheelSpinnerId || !ids.includes(this.state.wheelSpinnerId)) {
-      this.state.wheelSpinnerId = ids[Math.floor(Math.random() * ids.length)]
-    }
+    const otherIds = ids.filter((id) => id !== this.state.wheelSpinnerId)
+    const pool = otherIds.length > 0 ? otherIds : ids
+    this.state.wheelSpinnerId = pool[Math.floor(Math.random() * pool.length)]
     this.state.currentMinigame = MINIGAMES[Math.floor(Math.random() * MINIGAMES.length)]
     this.broadcast("round_started", {
       round: this.state.currentRound,
@@ -108,6 +111,7 @@ export class GameRoom extends Room<GameState> {
   private resolveCheat(playerId: string, caught: boolean, cheatType: string) {
     const player = this.state.players.get(playerId)
     if (!player) return
+    const startTimestamp = player.cheatStartTimestamp
     player.isCheating = false
     player.cheatStartTimestamp = 0
 
@@ -115,7 +119,7 @@ export class GameRoom extends Room<GameState> {
     event.playerId = playerId
     event.caught = caught
     event.cheatType = cheatType
-    event.startTimestamp = Date.now()
+    event.startTimestamp = startTimestamp
     this.state.cheatLog.push(event)
     this.pendingCheatTypes.delete(playerId)
 
