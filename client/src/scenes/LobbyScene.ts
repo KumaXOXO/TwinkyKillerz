@@ -41,10 +41,11 @@ export class LobbyScene extends Phaser.Scene {
       try {
         this.room = await joinGame("Player", "default")
 
-        this.room.onStateChange((state) => {
+        const unsubscribe = this.room.onStateChange((state) => {
           const names = [...state.players.values()].map((p) => p.name).join("\n")
           playerList.setText(names)
           if (state.phase === "wheel") {
+            unsubscribe()
             this.scene.start("WheelScene", { room: this.room })
           }
         })

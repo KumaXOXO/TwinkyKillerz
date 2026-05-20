@@ -26,7 +26,9 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     let y = height / 2 - 50
-    const sorted = [...this.room.state.players.values()].sort((a, b) => b.score - a.score)
+    const sorted = this.room.state?.players
+      ? [...this.room.state.players.values()].sort((a, b) => b.score - a.score)
+      : []
     for (const player of sorted) {
       this.add
         .text(width / 2, y, `${player.name}  —  ${player.score} pts`, {
@@ -46,15 +48,18 @@ export class ResultScene extends Phaser.Scene {
 
     this.input.keyboard?.once("keydown-SPACE", () => sendPlayerReady())
 
-    this.room.onStateChange((state) => {
-      if (state.phase === "wheel") this.scene.start("WheelScene", { room: this.room })
+    const unsubscribe = this.room.onStateChange((state) => {
+      if (state.phase === "wheel") {
+        unsubscribe()
+        this.scene.start("WheelScene", { room: this.room })
+        return
+      }
       if (state.phase === "gameover") {
-        this.add
-          .text(width / 2, height / 2 + 150, "GAME OVER", {
-            fontSize: "24px",
-            color: "#ff6060",
-          })
-          .setOrigin(0.5)
+        unsubscribe()
+        this.add.text(width / 2, height / 2 + 150, "GAME OVER", {
+          fontSize: "24px",
+          color: "#ff6060",
+        }).setOrigin(0.5)
       }
     })
   }
