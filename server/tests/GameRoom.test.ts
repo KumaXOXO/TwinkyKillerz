@@ -167,9 +167,29 @@ describe("GameRoom wheel mechanics", () => {
     room["handlePlayerReady"](c1, {})
     room["handlePlayerReady"](c2, {})
     expect(room.state.phase).toBe("wheel")
+
+    // Advance time past the minimum spin duration
+    const origNow = Date.now
+    Date.now = () => origNow() + 4000
+
     const spinnerClient = room.state.wheelSpinnerId === c1.sessionId ? c1 : c2
     room["handleWheelDone"](spinnerClient, {})
     expect(room.state.phase).toBe("minigame")
+
+    Date.now = origNow
+  })
+
+  it("ignores wheel_done sent too early (before min spin time)", () => {
+    const room = makeRoom()
+    const c1 = makeClient("p1")
+    const c2 = makeClient("p2")
+    room.onJoin(c1, { name: "Alice", characterId: "a" })
+    room.onJoin(c2, { name: "Bob", characterId: "b" })
+    room["handlePlayerReady"](c1, {})
+    room["handlePlayerReady"](c2, {})
+    const spinnerClient = room.state.wheelSpinnerId === c1.sessionId ? c1 : c2
+    room["handleWheelDone"](spinnerClient, {})
+    expect(room.state.phase).toBe("wheel")
   })
 
   it("ignores wheel_done from non-spinner", () => {

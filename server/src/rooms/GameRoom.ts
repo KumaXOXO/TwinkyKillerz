@@ -8,6 +8,7 @@ import {
   MINIGAMES,
   WHEEL_MIN_VELOCITY,
   WHEEL_MAX_VELOCITY,
+  WHEEL_BASE_DECEL,
 } from "../../../shared/constants"
 
 interface JoinOptions {
@@ -27,6 +28,7 @@ export class GameRoom extends Room<GameState> {
   maxClients = 4
   private readyPlayers = new Set<string>()
   private pendingCheatTypes = new Map<string, string>()
+  private wheelSpinStartTime = 0
 
   onCreate(_options: unknown) {
     this.setState(new GameState())
@@ -102,6 +104,7 @@ export class GameRoom extends Room<GameState> {
     this.state.phase = "wheel"
     this.state.wheelVelocity =
       WHEEL_MIN_VELOCITY + Math.random() * (WHEEL_MAX_VELOCITY - WHEEL_MIN_VELOCITY)
+    this.wheelSpinStartTime = Date.now()
     const ids = [...this.state.players.keys()]
     const otherIds = ids.filter((id) => id !== this.state.wheelSpinnerId)
     const pool = otherIds.length > 0 ? otherIds : ids
@@ -116,6 +119,8 @@ export class GameRoom extends Room<GameState> {
   private handleWheelDone(client: Client, _msg: unknown) {
     if (client.sessionId !== this.state.wheelSpinnerId) return
     if (this.state.phase !== "wheel") return
+    const minSpinMs = (WHEEL_MIN_VELOCITY / WHEEL_BASE_DECEL) * 1000
+    if (Date.now() - this.wheelSpinStartTime < minSpinMs) return
     this.state.phase = "minigame"
   }
 
