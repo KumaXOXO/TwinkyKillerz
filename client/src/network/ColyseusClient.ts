@@ -1,0 +1,36 @@
+import { Client, Room } from "colyseus.js"
+import type { GameState } from "@twinky/shared/schema"
+
+const WS_URL = (import.meta.env as Record<string, string>)["VITE_SERVER_URL"] ?? "ws://localhost:2567"
+
+let _client: Client | null = null
+let _room: Room<GameState> | null = null
+
+function getClient(): Client {
+  if (!_client) _client = new Client(WS_URL)
+  return _client
+}
+
+export async function joinGame(
+  name: string,
+  characterId: string
+): Promise<Room<GameState>> {
+  _room = await getClient().joinOrCreate<GameState>("game_room", { name, characterId })
+  return _room
+}
+
+export function getRoom(): Room<GameState> | null {
+  return _room
+}
+
+export function sendCheatAttempt(cheatType: string): void {
+  _room?.send("cheat_attempt", { cheatType })
+}
+
+export function sendCatchCheat(targetId: string): void {
+  _room?.send("catch_cheat", { targetId })
+}
+
+export function sendPlayerReady(): void {
+  _room?.send("player_ready", {})
+}
