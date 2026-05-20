@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { GameRoom } from "../src/rooms/GameRoom"
-import { CHEAT_WINDOW_MS, MAX_ROUNDS } from "../../shared/constants"
+import { CHEAT_WINDOW_MS, MAX_ROUNDS, WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY } from "../../shared/constants"
 
 function makeRoom() {
   const room = new GameRoom()
@@ -142,5 +142,46 @@ describe("GameRoom round management", () => {
     room["handlePlayerReady"](c1, {})
     room["handlePlayerReady"](c2, {})
     expect(["p1", "p2"]).toContain(room.state.wheelSpinnerId)
+  })
+})
+
+describe("GameRoom wheel mechanics", () => {
+  it("sets wheelVelocity within [WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY] on round start", () => {
+    const room = makeRoom()
+    const c1 = makeClient("p1")
+    const c2 = makeClient("p2")
+    room.onJoin(c1, { name: "Alice", characterId: "a" })
+    room.onJoin(c2, { name: "Bob", characterId: "b" })
+    room["handlePlayerReady"](c1, {})
+    room["handlePlayerReady"](c2, {})
+    expect(room.state.wheelVelocity).toBeGreaterThanOrEqual(WHEEL_MIN_VELOCITY)
+    expect(room.state.wheelVelocity).toBeLessThanOrEqual(WHEEL_MAX_VELOCITY)
+  })
+
+  it("transitions phase to 'minigame' when spinner sends wheel_done", () => {
+    const room = makeRoom()
+    const c1 = makeClient("p1")
+    const c2 = makeClient("p2")
+    room.onJoin(c1, { name: "Alice", characterId: "a" })
+    room.onJoin(c2, { name: "Bob", characterId: "b" })
+    room["handlePlayerReady"](c1, {})
+    room["handlePlayerReady"](c2, {})
+    expect(room.state.phase).toBe("wheel")
+    const spinnerClient = room.state.wheelSpinnerId === c1.sessionId ? c1 : c2
+    room["handleWheelDone"](spinnerClient, {})
+    expect(room.state.phase).toBe("minigame")
+  })
+
+  it("ignores wheel_done from non-spinner", () => {
+    const room = makeRoom()
+    const c1 = makeClient("p1")
+    const c2 = makeClient("p2")
+    room.onJoin(c1, { name: "Alice", characterId: "a" })
+    room.onJoin(c2, { name: "Bob", characterId: "b" })
+    room["handlePlayerReady"](c1, {})
+    room["handlePlayerReady"](c2, {})
+    const nonSpinnerClient = room.state.wheelSpinnerId === c1.sessionId ? c2 : c1
+    room["handleWheelDone"](nonSpinnerClient, {})
+    expect(room.state.phase).toBe("wheel")
   })
 })

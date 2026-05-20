@@ -6,6 +6,8 @@ import {
   SCORE_CHEAT_CAUGHT,
   SCORE_CHEAT_SUCCESS,
   MINIGAMES,
+  WHEEL_MIN_VELOCITY,
+  WHEEL_MAX_VELOCITY,
 } from "../../../shared/constants"
 
 interface JoinOptions {
@@ -35,6 +37,7 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("catch_cheat", (client, msg: CatchCheatMsg) =>
       this.handleCatchCheat(client, msg)
     )
+    this.onMessage("wheel_done", (client, msg) => this.handleWheelDone(client, msg))
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -97,6 +100,8 @@ export class GameRoom extends Room<GameState> {
       return
     }
     this.state.phase = "wheel"
+    this.state.wheelVelocity =
+      WHEEL_MIN_VELOCITY + Math.random() * (WHEEL_MAX_VELOCITY - WHEEL_MIN_VELOCITY)
     const ids = [...this.state.players.keys()]
     const otherIds = ids.filter((id) => id !== this.state.wheelSpinnerId)
     const pool = otherIds.length > 0 ? otherIds : ids
@@ -106,6 +111,12 @@ export class GameRoom extends Room<GameState> {
       round: this.state.currentRound,
       spinnerId: this.state.wheelSpinnerId,
     })
+  }
+
+  private handleWheelDone(client: Client, _msg: unknown) {
+    if (client.sessionId !== this.state.wheelSpinnerId) return
+    if (this.state.phase !== "wheel") return
+    this.state.phase = "minigame"
   }
 
   private resolveCheat(playerId: string, caught: boolean, cheatType: string) {
