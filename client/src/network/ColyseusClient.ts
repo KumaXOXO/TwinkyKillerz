@@ -34,3 +34,7 @@ export function sendCatchCheat(targetId: string): void {
 export function sendPlayerReady(): void {
   _room?.send("player_ready", {})
 }
+
+export function sendWheelDone(): void {
+  _room?.send("wheel_done", {})
+}
