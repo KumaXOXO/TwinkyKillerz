@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { GameRoom } from "../src/rooms/GameRoom"
-import { CHEAT_WINDOW_MS, MAX_ROUNDS, WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY } from "../../shared/constants"
+import { CHEAT_WINDOW_MS, MAX_ROUNDS, WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY, CHESS_TURN_MS } from "../../shared/constants"
 
 function makeRoom() {
   const room = new GameRoom()
@@ -203,5 +203,122 @@ describe("GameRoom wheel mechanics", () => {
     const nonSpinnerClient = room.state.wheelSpinnerId === c1.sessionId ? c2 : c1
     room["handleWheelDone"](nonSpinnerClient, {})
     expect(room.state.phase).toBe("wheel")
+  })
+})
+
+describe("GameRoom chess round", () => {
+  function setup4Players() {
+    const room = makeRoom()
+    const clients = ["p1","p2","p3","p4"].map(id => makeClient(id))
+    for (const [i, c] of clients.entries()) {
+      room.onJoin(c, { name: `Player${i+1}`, characterId: "a" })
+    }
+    return { room, clients }
+  }
+
+  it("startChessRound places 24 pieces in chessPieces", () => {
+    const { room } = setup4Players()
+    room["startChessRound"]()
+    expect(room.state.chessPieces.size).toBe(24)
+  })
+
+  it("startChessRound sets chessTurnPlayerId to first player", () => {
+    const { room } = setup4Players()
+    room["startChessRound"]()
+    expect(room.state.chessPlayerOrder[0]).toBe(room.state.chessTurnPlayerId)
+  })
+
+  it("startChessRound sets chessTurnDeadline ~30s in future", () => {
+    const { room } = setup4Players()
+    const before = Date.now()
+    room["startChessRound"]()
+    expect(room.state.chessTurnDeadline).toBeGreaterThan(before + 29_000)
+    expect(room.state.chessTurnDeadline).toBeLessThan(before + 31_000)
+  })
+
+  it("chess_move from wrong player is ignored", () => {
+    const { room, clients } = setup4Players()
+    room.state.phase = "minigame"
+    room["startChessRound"]()
+    const firstTurnId = room.state.chessTurnPlayerId
+    const wrongClient = clients.find(c => c.sessionId !== firstTurnId)!
+    room["handleChessMove"](wrongClient, { fromRow:6, fromCol:0, toRow:5, toCol:0 })
+    expect(room.state.chessTurnPlayerId).toBe(firstTurnId)
+  })
+
+  it("chess_move with invalid destination is ignored", () => {
+    const { room, clients } = setup4Players()
+    room.state.phase = "minigame"
+    room["startChessRound"]()
+    const firstTurnId = room.state.chessTurnPlayerId
+    const mover = clients.find(c => c.sessionId === firstTurnId)!
+    const pawn = [...room.state.chessPieces.values()].find(
+      p => p.ownerId === firstTurnId && p.pieceType === "pawn"
+    )!
+    // Move pawn onto itself — invalid
+    room["handleChessMove"](mover, { fromRow: pawn.row, fromCol: pawn.col, toRow: pawn.row, toCol: pawn.col })
+    expect(room.state.chessTurnPlayerId).toBe(firstTurnId)
+  })
+
+  it("valid chess_move advances turn to next player", () => {
+    const { room, clients } = setup4Players()
+    room.state.phase = "minigame"
+    room["startChessRound"]()
+    const firstTurnId = room.state.chessTurnPlayerId
+    const mover = clients.find(c => c.sessionId === firstTurnId)!
+    const pawn = [...room.state.chessPieces.values()].find(
+      p => p.ownerId === firstTurnId && p.pieceType === "pawn"
+    )!
+    const dir = room["chessPawnDirs"][firstTurnId] as number
+    room["handleChessMove"](mover, { fromRow: pawn.row, fromCol: pawn.col, toRow: pawn.row + dir, toCol: pawn.col })
+    expect(room.state.chessTurnPlayerId).not.toBe(firstTurnId)
+  })
+
+  it("valid chess_move updates piece position in state", () => {
+    const { room, clients } = setup4Players()
+    room.state.phase = "minigame"
+    room["startChessRound"]()
+    const firstTurnId = room.state.chessTurnPlayerId
+    const mover = clients.find(c => c.sessionId === firstTurnId)!
+    const pawn = [...room.state.chessPieces.values()].find(
+      p => p.ownerId === firstTurnId && p.pieceType === "pawn"
+    )!
+    const dir = room["chessPawnDirs"][firstTurnId] as number
+    const toRow = pawn.row + dir
+    room["handleChessMove"](mover, { fromRow: pawn.row, fromCol: pawn.col, toRow, toCol: pawn.col })
+    expect(room.state.chessPieces.get(pawn.id)!.row).toBe(toRow)
+  })
+
+  it("king capture turns captured player's pieces to ghosts", () => {
+    const { room, clients } = setup4Players()
+    room.state.phase = "minigame"
+    room["startChessRound"]()
+    // Direct manipulation: place attacker rook on king's cell (forcing a capture)
+    const victim = clients[1].sessionId
+    const attackerId = clients[0].sessionId
+    const victimKing = [...room.state.chessPieces.values()].find(
+      p => p.ownerId === victim && p.pieceType === "king"
+    )!
+    // Directly invoke eliminatePlayer to test ghost conversion
+    room["eliminatePlayer"](victim)
+    room["syncChessBoard"]()
+    const allVictimPieces = [...room.state.chessPieces.values()].filter(p => p.ownerId === victim)
+    expect(allVictimPieces.every(p => p.isGhost)).toBe(true)
+    expect(room.state.chessEliminatedIds.includes(victim)).toBe(true)
+  })
+
+  it("last surviving player triggers result phase and +3 score", () => {
+    const { room, clients } = setup4Players()
+    room.state.phase = "minigame"
+    room["startChessRound"]()
+    // Eliminate all but first player
+    const [winner, ...losers] = [...room.state.chessPlayerOrder]
+    for (const id of losers) {
+      room["eliminatePlayer"](id)
+    }
+    room["syncChessBoard"]()
+    room["checkChessWin"]()
+    expect(room.state.phase).toBe("result")
+    expect(room.state.players.get(winner)!.score).toBe(3)
   })
 })

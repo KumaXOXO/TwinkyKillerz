@@ -244,11 +244,12 @@ export class GameRoom extends Room<GameState> {
       msg.fromRow, msg.fromCol, msg.toRow, msg.toCol
     )
     this.chessPiecesData = updated
-    this.syncChessBoard()
 
     if (captured && captured.pieceType === "king") {
       this.eliminatePlayer(captured.ownerId)
     }
+
+    this.syncChessBoard()
 
     if (this.checkChessWin()) return
 
@@ -260,7 +261,6 @@ export class GameRoom extends Room<GameState> {
       p.ownerId === playerId ? { ...p, isGhost: true } : p
     )
     this.state.chessEliminatedIds.push(playerId)
-    this.syncChessBoard()
   }
 
   private checkChessWin(): boolean {
