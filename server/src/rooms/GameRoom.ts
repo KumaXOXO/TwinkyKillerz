@@ -1,5 +1,5 @@
 import { Room, Client } from "@colyseus/core"
-import { GameState, PlayerState, CheatEvent } from "../../../shared/schema"
+import { GameState, PlayerState, CheatEvent, ChessPiece } from "../../../shared/schema"
 import {
   CHEAT_WINDOW_MS,
   MAX_ROUNDS,
@@ -9,7 +9,11 @@ import {
   WHEEL_MIN_VELOCITY,
   WHEEL_MAX_VELOCITY,
   WHEEL_BASE_DECEL,
+  CHESS_CORNERS,
+  CHESS_PAWN_DIRS,
+  CHESS_TURN_MS,
 } from "../../../shared/constants"
+import { buildInitialBoard, getValidMoves, applyMove, ChessPieceData } from "../../../shared/chessLogic"
 
 interface JoinOptions {
   name: string
@@ -29,6 +33,9 @@ export class GameRoom extends Room<GameState> {
   private readyPlayers = new Set<string>()
   private pendingCheatTypes = new Map<string, string>()
   private wheelSpinStartTime = 0
+  private chessPiecesData: ChessPieceData[] = []
+  private chessPawnDirs: Record<string, number> = {}
+  private chessTurnToken = 0
 
   onCreate(_options: unknown) {
     this.setState(new GameState())
@@ -40,6 +47,9 @@ export class GameRoom extends Room<GameState> {
       this.handleCatchCheat(client, msg)
     )
     this.onMessage("wheel_done", (client, msg) => this.handleWheelDone(client, msg))
+    this.onMessage("chess_move", (client, msg: { fromRow: number; fromCol: number; toRow: number; toCol: number }) =>
+      this.handleChessMove(client, msg)
+    )
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -122,6 +132,9 @@ export class GameRoom extends Room<GameState> {
     const minSpinMs = (this.state.wheelVelocity / WHEEL_BASE_DECEL) * 1000
     if (Date.now() - this.wheelSpinStartTime < minSpinMs) return
     this.state.phase = "minigame"
+    if (this.state.currentMinigame === "chess") {
+      this.startChessRound()
+    }
   }
 
   private resolveCheat(playerId: string, caught: boolean, cheatType: string) {
@@ -144,6 +157,132 @@ export class GameRoom extends Room<GameState> {
     } else {
       player.score += SCORE_CHEAT_SUCCESS
       this.broadcast("cheat_succeeded", { playerId })
+    }
+  }
+
+  private startChessRound() {
+    const playerIds = [...this.state.players.keys()]
+    this.chessPiecesData = buildInitialBoard(playerIds)
+
+    this.chessPawnDirs = {}
+    playerIds.forEach((id, idx) => {
+      const corner = CHESS_CORNERS[idx % 4]
+      this.chessPawnDirs[id] = CHESS_PAWN_DIRS[corner]
+    })
+
+    this.state.chessPlayerOrder.clear()
+    playerIds.forEach(id => this.state.chessPlayerOrder.push(id))
+
+    this.state.chessEliminatedIds.clear()
+
+    this.syncChessBoard()
+
+    this.advanceChessTurn(playerIds[0])
+  }
+
+  private syncChessBoard() {
+    for (const id of [...this.state.chessPieces.keys()]) {
+      if (!this.chessPiecesData.find(p => p.id === id)) {
+        this.state.chessPieces.delete(id)
+      }
+    }
+    for (const data of this.chessPiecesData) {
+      let piece = this.state.chessPieces.get(data.id)
+      if (!piece) {
+        piece = new ChessPiece()
+        this.state.chessPieces.set(data.id, piece)
+      }
+      piece.id = data.id
+      piece.pieceType = data.pieceType
+      piece.ownerId = data.ownerId
+      piece.row = data.row
+      piece.col = data.col
+      piece.isGhost = data.isGhost
+    }
+  }
+
+  private advanceChessTurn(playerId: string) {
+    this.state.chessTurnPlayerId = playerId
+    this.state.chessTurnDeadline = Date.now() + CHESS_TURN_MS
+    this.scheduleTurnTimeout(++this.chessTurnToken, playerId)
+  }
+
+  private scheduleTurnTimeout(token: number, playerId: string) {
+    this.clock.setTimeout(() => {
+      if (token !== this.chessTurnToken) return
+      if (this.state.phase !== "minigame") return
+      this.advanceToNextPlayer(playerId)
+    }, CHESS_TURN_MS)
+  }
+
+  private advanceToNextPlayer(currentPlayerId: string) {
+    const active = this.getActiveChessPlayers()
+    if (active.length === 0) return
+    const idx = active.indexOf(currentPlayerId)
+    const next = active[(idx + 1) % active.length]
+    this.advanceChessTurn(next)
+  }
+
+  private handleChessMove(
+    client: Client,
+    msg: { fromRow: number; fromCol: number; toRow: number; toCol: number }
+  ) {
+    if (this.state.phase !== "minigame") return
+    if (client.sessionId !== this.state.chessTurnPlayerId) return
+
+    const movingPiece = this.chessPiecesData.find(
+      p => p.row === msg.fromRow && p.col === msg.fromCol && p.ownerId === client.sessionId
+    )
+    if (!movingPiece) return
+
+    const validMoves = getValidMoves(movingPiece.id, this.chessPiecesData, this.chessPawnDirs)
+    const isValid = validMoves.some(([r, c]) => r === msg.toRow && c === msg.toCol)
+    if (!isValid) return
+
+    const { pieces: updated, captured } = applyMove(
+      this.chessPiecesData,
+      msg.fromRow, msg.fromCol, msg.toRow, msg.toCol
+    )
+    this.chessPiecesData = updated
+    this.syncChessBoard()
+
+    if (captured && captured.pieceType === "king") {
+      this.eliminatePlayer(captured.ownerId)
+    }
+
+    if (this.checkChessWin()) return
+
+    this.advanceToNextPlayer(client.sessionId)
+  }
+
+  private eliminatePlayer(playerId: string) {
+    this.chessPiecesData = this.chessPiecesData.map(p =>
+      p.ownerId === playerId ? { ...p, isGhost: true } : p
+    )
+    this.state.chessEliminatedIds.push(playerId)
+    this.syncChessBoard()
+  }
+
+  private checkChessWin(): boolean {
+    const active = this.getActiveChessPlayers()
+    if (active.length > 1) return false
+    this.endChessRound(active[0] ?? null)
+    return true
+  }
+
+  private getActiveChessPlayers(): string[] {
+    return [...this.state.chessPlayerOrder].filter(id => !this.isEliminated(id))
+  }
+
+  private isEliminated(playerId: string): boolean {
+    return this.state.chessEliminatedIds.includes(playerId)
+  }
+
+  private endChessRound(winnerId: string | null) {
+    this.state.phase = "result"
+    if (winnerId) {
+      const winner = this.state.players.get(winnerId)
+      if (winner) winner.score += 3
     }
   }
 }

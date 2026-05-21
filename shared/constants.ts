@@ -13,3 +13,27 @@ export const MINIGAMES = ["chess"] as const
 export type Minigame = (typeof MINIGAMES)[number]
 
 export type GamePhase = "lobby" | "wheel" | "minigame" | "result" | "gameover"
+
+export const CHESS_CORNERS = ["bottom-left", "bottom-right", "top-right", "top-left"] as const
+export type ChessCorner = (typeof CHESS_CORNERS)[number]
+
+// [row, col, pieceType] for each player's corner
+export const CHESS_STARTING_POSITIONS: Record<ChessCorner, Array<[number, number, string]>> = {
+  "bottom-left":  [[7,0,"rook"],[7,1,"king"],[7,2,"knight"],[6,0,"pawn"],[6,1,"pawn"],[6,2,"pawn"]],
+  "bottom-right": [[7,7,"rook"],[7,6,"king"],[7,5,"knight"],[6,7,"pawn"],[6,6,"pawn"],[6,5,"pawn"]],
+  "top-right":    [[0,7,"rook"],[0,6,"king"],[0,5,"knight"],[1,7,"pawn"],[1,6,"pawn"],[1,5,"pawn"]],
+  "top-left":     [[0,0,"rook"],[0,1,"king"],[0,2,"knight"],[1,0,"pawn"],[1,1,"pawn"],[1,2,"pawn"]],
+}
+
+// pawn advances toward center: bottom players go up (-1), top players go down (+1)
+export const CHESS_PAWN_DIRS: Record<ChessCorner, number> = {
+  "bottom-left": -1, "bottom-right": -1, "top-right": 1, "top-left": 1,
+}
+
+export const CHESS_PLAYER_COLORS = ["#aa77ff", "#44ddff", "#ffaa44", "#44ff88"] as const
+
+export const CHESS_PIECE_SYMBOLS: Record<string, string> = {
+  king: "♔", queen: "♕", rook: "♖", bishop: "♗", knight: "♘", pawn: "♙",
+}
+
+export const CHESS_TURN_MS = 30_000

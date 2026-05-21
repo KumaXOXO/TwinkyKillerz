@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./schema": "./schema.ts",
-    "./constants": "./constants.ts"
+    "./constants": "./constants.ts",
+    "./chessLogic": "./chessLogic.ts"
   }
 }

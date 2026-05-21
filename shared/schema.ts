@@ -7,6 +7,15 @@ export class CheatEvent extends Schema {
   @type("boolean") caught: boolean = false
 }
 
+export class ChessPiece extends Schema {
+  @type("string") id: string = ""
+  @type("string") pieceType: string = ""
+  @type("string") ownerId: string = ""
+  @type("number") row: number = 0
+  @type("number") col: number = 0
+  @type("boolean") isGhost: boolean = false
+}
+
 export class PlayerState extends Schema {
   @type("string") id: string = ""
   @type("string") name: string = ""
@@ -25,4 +34,9 @@ export class GameState extends Schema {
   @type("number") wheelVelocity: number = 0
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>()
   @type([CheatEvent]) cheatLog = new ArraySchema<CheatEvent>()
+  @type({ map: ChessPiece }) chessPieces = new MapSchema<ChessPiece>()
+  @type("string") chessTurnPlayerId: string = ""
+  @type("number") chessTurnDeadline: number = 0
+  @type(["string"]) chessPlayerOrder = new ArraySchema<string>()
+  @type(["string"]) chessEliminatedIds = new ArraySchema<string>()
 }

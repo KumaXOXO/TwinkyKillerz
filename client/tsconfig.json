@@ -8,8 +8,10 @@
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
     "paths": {
-      "@twinky/shared/*": ["../shared/*"]
+      "@twinky/shared/*": ["../shared/*"],
+      "@colyseus/schema": ["./node_modules/@colyseus/schema/lib/index.d.ts"]
     }
   },
   "include": ["src/**/*", "../shared/**/*"]

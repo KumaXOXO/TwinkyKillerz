@@ -38,3 +38,7 @@ export function sendPlayerReady(): void {
 export function sendWheelDone(): void {
   _room?.send("wheel_done", {})
 }
+
+export function sendChessMove(fromRow: number, fromCol: number, toRow: number, toCol: number): void {
+  _room?.send("chess_move", { fromRow, fromCol, toRow, toCol })
+}

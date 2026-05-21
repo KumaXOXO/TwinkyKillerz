@@ -48,19 +48,20 @@ export class ResultScene extends Phaser.Scene {
 
     this.input.keyboard?.once("keydown-SPACE", () => sendPlayerReady())
 
-    const unsubscribe = this.room.onStateChange((state) => {
+    const onStateChange = (state: GameState) => {
       if (state.phase === "wheel") {
-        unsubscribe()
+        this.room.onStateChange.remove(onStateChange)
         this.scene.start("WheelScene", { room: this.room })
         return
       }
       if (state.phase === "gameover") {
-        unsubscribe()
+        this.room.onStateChange.remove(onStateChange)
         this.add.text(width / 2, height / 2 + 150, "GAME OVER", {
           fontSize: "24px",
           color: "#ff6060",
         }).setOrigin(0.5)
       }
-    })
+    }
+    this.room.onStateChange(onStateChange)
   }
 }
