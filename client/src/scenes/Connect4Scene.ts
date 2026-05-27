@@ -3,6 +3,7 @@ import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 import { CONNECT4_COLS, CONNECT4_ROWS, CHESS_PLAYER_COLORS } from "@twinky/shared/constants"
 import { sendConnect4Drop } from "../network/ColyseusClient"
+import { sounds } from "../utils/SoundManager"
 
 const CELL = 60
 const GRID_X = (800 - CONNECT4_COLS * CELL) / 2
@@ -99,6 +100,7 @@ export class Connect4Scene extends Phaser.Scene {
           this.room.onStateChange.remove(this.stateChangeCallback)
           this.stateChangeCallback = null
         }
+        sounds.roundWin()
         this.time.delayedCall(2500, () => {
           this.scene.start("ResultScene", { room: this.room })
         })
@@ -166,6 +168,7 @@ export class Connect4Scene extends Phaser.Scene {
     const cx = GRID_X + col * CELL + CELL / 2
     const r = CELL / 2 - 4
 
+    sounds.connect4Drop()
     const g = this.add.graphics()
     g.fillStyle(color)
     g.fillCircle(cx, 0, r)

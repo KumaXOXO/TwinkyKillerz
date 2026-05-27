@@ -4,6 +4,7 @@ import type { GameState, ChessPiece } from "@twinky/shared/schema"
 import { CHESS_PIECE_SYMBOLS, CHESS_PLAYER_COLORS } from "@twinky/shared/constants"
 import { getLegalMoves, isInCheck, ChessPieceData } from "@twinky/shared/chessLogic"
 import { sendChessMove } from "../network/ColyseusClient"
+import { sounds } from "../utils/SoundManager"
 
 const CELL_SIZE = 56
 const BOARD_OFFSET_X = (800 - CELL_SIZE * 8) / 2
@@ -70,6 +71,7 @@ export class ChessScene extends Phaser.Scene {
           this.room.onStateChange.remove(this.stateChangeCallback)
           this.stateChangeCallback = null
         }
+        sounds.roundWin()
         this.scene.start("ResultScene", { room: this.room })
         return
       }
@@ -163,6 +165,7 @@ export class ChessScene extends Phaser.Scene {
       } else {
         const prev = this.prevPositions.get(id)
         if (prev && (prev.x !== x || prev.y !== y)) {
+          sounds.pieceMove()
           this.tweens.add({ targets: text, x, y, duration: 180, ease: "Cubic.easeOut" })
         } else {
           text.setPosition(x, y)
@@ -176,6 +179,7 @@ export class ChessScene extends Phaser.Scene {
 
     for (const [id, text] of this.pieceTexts.entries()) {
       if (!currentIds.has(id)) {
+        sounds.pieceCapture()
         this.emitCaptureParticles(text.x, text.y)
         text.destroy()
         this.pieceTexts.delete(id)
@@ -205,7 +209,10 @@ export class ChessScene extends Phaser.Scene {
     const inCheck = isInCheck(pieces, myId, this.pawnDirs)
 
     if (inCheck) {
-      if (!this.wasInCheck) this.flashScreen(0xff0000, 0.35)
+      if (!this.wasInCheck) {
+        sounds.check()
+        this.flashScreen(0xff0000, 0.35)
+      }
       this.checkText.setText("CHECK!")
       const king = pieces.find(p => p.ownerId === myId && p.pieceType === "king" && !p.isGhost)
       if (king) {

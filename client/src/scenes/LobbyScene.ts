@@ -17,6 +17,7 @@ export class LobbyScene extends Phaser.Scene {
   private uiPhase: "nameInput" | "lobby" = "nameInput"
   private inputMode: "none" | "chat" = "none"
   private typedName = ""
+  private characterId = "default"
   private typedChat = ""
   private cursorVisible = true
   private cursorTimer = 0
@@ -35,8 +36,17 @@ export class LobbyScene extends Phaser.Scene {
     super({ key: "LobbyScene" })
   }
 
+  init(data?: { name?: string; characterId?: string }) {
+    this.typedName = data?.name ?? ""
+    this.characterId = data?.characterId ?? "default"
+  }
+
   create() {
-    this.buildNameInputScreen()
+    if (this.typedName) {
+      this.doJoin(this.typedName)
+    } else {
+      this.buildNameInputScreen()
+    }
     this.input.keyboard!.on("keydown", this.handleKeydown, this)
   }
 
@@ -223,7 +233,7 @@ export class LobbyScene extends Phaser.Scene {
   private async doJoin(name: string) {
     this.nameHintText?.setText("Connecting...")
     try {
-      this.room = await joinGame(name, "default")
+      this.room = await joinGame(name, this.characterId)
       this.uiPhase = "lobby"
       this.children.removeAll(true)
       this.setupStateSync()
