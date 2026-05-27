@@ -23,6 +23,7 @@ export class Connect4Scene extends Phaser.Scene {
   private timerText!: Phaser.GameObjects.Text
   private colHints: Phaser.GameObjects.Text[] = []
   private playerColors: Record<string, number> = {}
+  private prevBoard: string[] = []
 
   constructor() {
     super({ key: "Connect4Scene" })
@@ -33,6 +34,7 @@ export class Connect4Scene extends Phaser.Scene {
     this.playerColors = {}
     this.cellGraphics = []
     this.colHints = []
+    this.prevBoard = []
   }
 
   create() {
@@ -42,9 +44,9 @@ export class Connect4Scene extends Phaser.Scene {
       .text(width / 2, 24, "CONNECT 4", { fontSize: "22px", color: C.text, fontStyle: "bold" })
       .setOrigin(0.5)
 
-    const playerIds = [...this.room.state.connect4.playerOrder]
+    const playerIds = [...this.room.state.connect4.playerOrder].filter((id): id is string => !!id)
     playerIds.forEach((id, i) => {
-      const raw = CHESS_PLAYER_COLORS[i % CHESS_PLAYER_COLORS.length]
+      const raw = CHESS_PLAYER_COLORS[i % CHESS_PLAYER_COLORS.length] ?? "#ffffff"
       this.playerColors[id] = parseInt(raw.replace("#", ""), 16)
     })
 
@@ -52,7 +54,7 @@ export class Connect4Scene extends Phaser.Scene {
     let legendX = GRID_X
     playerIds.forEach((id, i) => {
       const name = this.room.state.players.get(id)?.name ?? "?"
-      const color = CHESS_PLAYER_COLORS[i % CHESS_PLAYER_COLORS.length]
+      const color = CHESS_PLAYER_COLORS[i % CHESS_PLAYER_COLORS.length] ?? "#ffffff"
       this.add.text(legendX, height - 16, `● ${name}`, { fontSize: "12px", color }).setOrigin(0, 1)
       legendX += 110
     })
@@ -145,14 +147,38 @@ export class Connect4Scene extends Phaser.Scene {
       for (let c = 0; c < CONNECT4_COLS; c++) {
         const idx = r * CONNECT4_COLS + c
         const cell = board[idx] ?? ""
+        const prev = this.prevBoard[idx] ?? ""
         const g = this.cellGraphics[idx]
         if (!g) continue
         g.clear()
         const color = cell ? (this.playerColors[cell] ?? 0x888888) : C.empty
         g.fillStyle(color)
         g.fillCircle(GRID_X + c * CELL + CELL / 2, GRID_Y + r * CELL + CELL / 2, CELL / 2 - 4)
+        if (cell && !prev) this.animateDrop(c, r, color)
       }
     }
+    this.prevBoard = [...board].map(c => c ?? "")
+  }
+
+  private animateDrop(col: number, targetRow: number, color: number) {
+    const startY = GRID_Y + CELL / 2
+    const endY = GRID_Y + targetRow * CELL + CELL / 2
+    const cx = GRID_X + col * CELL + CELL / 2
+    const r = CELL / 2 - 4
+
+    const g = this.add.graphics()
+    g.fillStyle(color)
+    g.fillCircle(cx, 0, r)
+    g.setPosition(0, startY)
+    g.setDepth(10)
+
+    this.tweens.add({
+      targets: g,
+      y: endY,
+      duration: 80 + targetRow * 35,
+      ease: "Bounce.easeOut",
+      onComplete: () => g.destroy(),
+    })
   }
 
   private updateStatus() {

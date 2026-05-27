@@ -24,6 +24,9 @@ export class ChessScene extends Phaser.Scene {
   private pawnDirs: Record<string, number> = {}
   private playerColors: Record<string, string> = {}
   private stateChangeCallback: ((state: GameState) => void) | null = null
+  private prevPositions: Map<string, { x: number; y: number }> = new Map()
+  private prevScores: Map<string, number> = new Map()
+  private wasInCheck = false
 
   constructor() {
     super({ key: "ChessScene" })
@@ -31,6 +34,19 @@ export class ChessScene extends Phaser.Scene {
 
   init(data: { room: Room<GameState> }) {
     this.room = data.room
+    this.prevPositions = new Map()
+    this.prevScores = new Map()
+    this.wasInCheck = false
+    this.pieceTexts = new Map()
+    this.scoreTexts = []
+  }
+
+  preload() {
+    const g = this.make.graphics({ x: 0, y: 0 })
+    g.fillStyle(0xffffff)
+    g.fillCircle(4, 4, 4)
+    g.generateTexture("chess_particle", 8, 8)
+    g.destroy()
   }
 
   create() {
@@ -121,6 +137,11 @@ export class ChessScene extends Phaser.Scene {
       const player = this.room.state.players.get(id)
       const name = player?.name ?? "?"
       const score = player?.score ?? 0
+      const prev = this.prevScores.get(id)
+      if (prev !== undefined && score > prev) {
+        this.spawnFloatingScore(t.x + 80, t.y, score - prev)
+      }
+      this.prevScores.set(id, score)
       const elim = eliminated.has(id) ? " ✗" : ""
       t.setText(`${name}: ${score}${elim}`)
     })
@@ -140,28 +161,52 @@ export class ChessScene extends Phaser.Scene {
         text = this.add.text(x, y, symbol, { fontSize: "28px", color }).setOrigin(0.5)
         this.pieceTexts.set(id, text)
       } else {
-        text.setPosition(x, y)
+        const prev = this.prevPositions.get(id)
+        if (prev && (prev.x !== x || prev.y !== y)) {
+          this.tweens.add({ targets: text, x, y, duration: 180, ease: "Cubic.easeOut" })
+        } else {
+          text.setPosition(x, y)
+        }
         text.setText(symbol)
         text.setStyle({ color })
       }
       text.setAlpha(piece.isGhost ? 0.3 : 1)
+      this.prevPositions.set(id, { x, y })
     })
 
     for (const [id, text] of this.pieceTexts.entries()) {
       if (!currentIds.has(id)) {
+        this.emitCaptureParticles(text.x, text.y)
         text.destroy()
         this.pieceTexts.delete(id)
+        this.prevPositions.delete(id)
       }
     }
+  }
+
+  private emitCaptureParticles(x: number, y: number) {
+    const emitter = this.add.particles(x, y, "chess_particle", {
+      speed: { min: 50, max: 130 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.4, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 420,
+      quantity: 12,
+      tint: 0xffdd88,
+      stopAfter: 12,
+    })
+    this.time.delayedCall(500, () => emitter.destroy())
   }
 
   private updateCheckState() {
     this.checkGraphics.clear()
     const myId = this.room.sessionId
     const pieces = this.buildPiecesArray()
-    if (isInCheck(pieces, myId, this.pawnDirs)) {
+    const inCheck = isInCheck(pieces, myId, this.pawnDirs)
+
+    if (inCheck) {
+      if (!this.wasInCheck) this.flashScreen(0xff0000, 0.35)
       this.checkText.setText("CHECK!")
-      // Tint own king cell red
       const king = pieces.find(p => p.ownerId === myId && p.pieceType === "king" && !p.isGhost)
       if (king) {
         const x = BOARD_OFFSET_X + king.col * CELL_SIZE
@@ -172,6 +217,35 @@ export class ChessScene extends Phaser.Scene {
     } else {
       this.checkText.setText("")
     }
+    this.wasInCheck = inCheck
+  }
+
+  private flashScreen(color: number, maxAlpha: number) {
+    const { width, height } = this.scale
+    const flash = this.add.graphics()
+    flash.fillStyle(color, maxAlpha)
+    flash.fillRect(0, 0, width, height)
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 400,
+      ease: "Cubic.easeOut",
+      onComplete: () => flash.destroy(),
+    })
+  }
+
+  private spawnFloatingScore(x: number, y: number, delta: number) {
+    const text = this.add
+      .text(x, y, `+${delta}`, { fontSize: "14px", color: "#ffff44", fontStyle: "bold" })
+      .setOrigin(0, 0.5)
+    this.tweens.add({
+      targets: text,
+      y: y - 32,
+      alpha: 0,
+      duration: 900,
+      ease: "Cubic.easeOut",
+      onComplete: () => text.destroy(),
+    })
   }
 
   private handleBoardClick(sx: number, sy: number) {
@@ -200,7 +274,6 @@ export class ChessScene extends Phaser.Scene {
       this.selectedPieceId = clicked.id
       const piecesArray = this.buildPiecesArray()
       this.validMovesCache = getLegalMoves(clicked.id, piecesArray, this.pawnDirs)
-      // Mark which destinations have an enemy piece (captures)
       this.captureMovesCache.clear()
       for (const [r, c] of this.validMovesCache) {
         const dest = this.getPieceAtCell(r, c)
@@ -247,7 +320,6 @@ export class ChessScene extends Phaser.Scene {
       }
       this.highlightGraphics.fillRect(x, y, CELL_SIZE, CELL_SIZE)
     }
-    // Highlight selected piece cell
     if (this.selectedPieceId) {
       const src = this.getPieceDataById(this.selectedPieceId)
       if (src) {

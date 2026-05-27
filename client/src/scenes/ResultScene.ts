@@ -41,13 +41,24 @@ export class ResultScene extends Phaser.Scene {
     sorted.forEach((player, idx) => {
       const medal = idx === 0 ? "★ " : `${idx + 1}. `
       const color = idx === 0 ? C.crown : C.text
-      this.add.text(width / 2 - 120, y, `${medal}${player.name}`, { fontSize: "18px", color })
-      this.add.text(width / 2 + 40, y, `${player.score} pts`, { fontSize: "18px", color: C.muted })
+      const delay = 300 + idx * 150
+
+      const nameText = this.add
+        .text(width / 2 - 120, y, `${medal}${player.name}`, { fontSize: "18px", color })
+        .setAlpha(0)
+      const scoreText = this.add
+        .text(width / 2 + 40, y, `${player.score} pts`, { fontSize: "18px", color: C.muted })
+        .setAlpha(0)
+      this.tweens.add({ targets: [nameText, scoreText], alpha: 1, delay, duration: 350 })
+
       if (player.chips > 0) {
-        this.add.text(width / 2 + 120, y, `+${player.chips} chip${player.chips !== 1 ? "s" : ""}`, {
-          fontSize: "14px",
-          color: C.chip,
-        })
+        const chipText = this.add
+          .text(width / 2 + 120, y, `+${player.chips} chip${player.chips !== 1 ? "s" : ""}`, {
+            fontSize: "14px",
+            color: C.chip,
+          })
+          .setAlpha(0)
+        this.tweens.add({ targets: chipText, alpha: 1, delay: delay + 120, duration: 300 })
       }
       y += 34
     })
