@@ -5,6 +5,7 @@ import { CHESS_PIECE_SYMBOLS, CHESS_PLAYER_COLORS } from "@twinky/shared/constan
 import { getLegalMoves, isInCheck, ChessPieceData } from "@twinky/shared/chessLogic"
 import { sendChessMove } from "../network/ColyseusClient"
 import { sounds } from "../utils/SoundManager"
+import { CheatHUD } from "../utils/CheatHUD"
 
 const CELL_SIZE = 56
 const BOARD_OFFSET_X = (800 - CELL_SIZE * 8) / 2
@@ -28,6 +29,7 @@ export class ChessScene extends Phaser.Scene {
   private prevPositions: Map<string, { x: number; y: number }> = new Map()
   private prevScores: Map<string, number> = new Map()
   private wasInCheck = false
+  private cheatHUD!: CheatHUD
 
   constructor() {
     super({ key: "ChessScene" })
@@ -89,6 +91,8 @@ export class ChessScene extends Phaser.Scene {
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       this.handleBoardClick(pointer.x, pointer.y)
     })
+
+    this.cheatHUD = new CheatHUD(this, this.room, "chess_peek")
   }
 
   private drawBoard() {
@@ -355,6 +359,7 @@ export class ChessScene extends Phaser.Scene {
     const secs = Math.ceil(remaining / 1000)
     const urgent = secs <= 10 && this.room.state.chess.turnPlayerId === this.room.sessionId
     this.timerText.setText(`${secs}s`).setStyle({ color: urgent ? "#ff4444" : "#888888" })
+    this.cheatHUD?.update()
   }
 
   shutdown() {
@@ -362,5 +367,6 @@ export class ChessScene extends Phaser.Scene {
       this.room.onStateChange.remove(this.stateChangeCallback)
       this.stateChangeCallback = null
     }
+    this.cheatHUD?.destroy()
   }
 }

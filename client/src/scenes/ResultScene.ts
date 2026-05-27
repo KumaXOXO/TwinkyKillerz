@@ -63,6 +63,32 @@ export class ResultScene extends Phaser.Scene {
       y += 34
     })
 
+    // Cheat log for this round
+    const cheatEvents = [...this.room.state.cheatLog]
+    if (cheatEvents.length > 0) {
+      this.add.text(width / 2, y + 8, "CHEAT LOG", { fontSize: "11px", color: C.muted }).setOrigin(0.5)
+      let cy = y + 24
+      cheatEvents.slice(-4).forEach((ev, i) => {
+        if (!ev) return
+        const name = this.room.state.players.get(ev.playerId)?.name ?? "?"
+        const line = ev.caught ? `${name} CAUGHT cheating ✗` : `${name} cheated successfully ✓`
+        const color = ev.caught ? "#ff6060" : "#44ff88"
+        this.add
+          .text(width / 2, cy, line, { fontSize: "12px", color })
+          .setOrigin(0.5)
+          .setAlpha(0)
+          .setData("delay", 600 + i * 100)
+        cy += 18
+      })
+      // Tween them in
+      this.children.list
+        .filter(obj => obj.getData?.("delay") !== undefined)
+        .forEach(obj => {
+          const delay = obj.getData("delay") as number
+          this.tweens.add({ targets: obj, alpha: 1, delay, duration: 300 })
+        })
+    }
+
     this.add
       .text(width / 2, height - 60, "Press SPACE to continue", { fontSize: "14px", color: C.muted })
       .setOrigin(0.5)

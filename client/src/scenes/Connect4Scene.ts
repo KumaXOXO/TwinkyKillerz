@@ -4,6 +4,7 @@ import type { GameState } from "@twinky/shared/schema"
 import { CONNECT4_COLS, CONNECT4_ROWS, CHESS_PLAYER_COLORS } from "@twinky/shared/constants"
 import { sendConnect4Drop } from "../network/ColyseusClient"
 import { sounds } from "../utils/SoundManager"
+import { CheatHUD } from "../utils/CheatHUD"
 
 const CELL = 60
 const GRID_X = (800 - CONNECT4_COLS * CELL) / 2
@@ -25,6 +26,7 @@ export class Connect4Scene extends Phaser.Scene {
   private colHints: Phaser.GameObjects.Text[] = []
   private playerColors: Record<string, number> = {}
   private prevBoard: string[] = []
+  private cheatHUD!: CheatHUD
 
   constructor() {
     super({ key: "Connect4Scene" })
@@ -91,6 +93,7 @@ export class Connect4Scene extends Phaser.Scene {
 
     this.drawPieces()
     this.updateStatus()
+    this.cheatHUD = new CheatHUD(this, this.room, "connect4_peek")
 
     this.stateChangeCallback = (state) => {
       this.drawPieces()
@@ -116,6 +119,7 @@ export class Connect4Scene extends Phaser.Scene {
       Math.ceil((this.room.state.connect4.turnDeadline - Date.now()) / 1000),
     )
     this.timerText?.setText(`${remaining}s`)
+    this.cheatHUD?.update()
   }
 
   shutdown() {
@@ -126,6 +130,7 @@ export class Connect4Scene extends Phaser.Scene {
     for (let c = 0; c < CONNECT4_COLS; c++) {
       this.input.keyboard?.removeAllListeners(`keydown-${c + 1}`)
     }
+    this.cheatHUD?.destroy()
   }
 
   private drawBoard() {
