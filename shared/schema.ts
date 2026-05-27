@@ -49,6 +49,14 @@ export class OlympiadeState extends Schema {
   @type(WheelState) wheel = new WheelState()
 }
 
+export class Connect4State extends Schema {
+  @type(["string"]) board = new ArraySchema<string>()
+  @type("string") turnPlayerId: string = ""
+  @type("number") turnDeadline: number = 0
+  @type(["string"]) playerOrder = new ArraySchema<string>()
+  @type("string") winnerId: string = ""
+}
+
 export class PlayerState extends Schema {
   @type("string") id: string = ""
   @type("string") name: string = ""
@@ -72,4 +80,5 @@ export class GameState extends Schema {
   @type([ChatMessage]) chatMessages = new ArraySchema<ChatMessage>()
   @type(OlympiadeState) olympiade = new OlympiadeState()
   @type(ChessState) chess = new ChessState()
+  @type(Connect4State) connect4 = new Connect4State()
 }

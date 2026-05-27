@@ -105,7 +105,8 @@ export class WheelScene extends Phaser.Scene {
         this.chipsText.setText("")
         this.statusText.setText("")
         this.time.delayedCall(500, () => {
-          this.scene.start("ChessScene", { room: this.room })
+          const sceneKey = state.olympiade.currentMinigame === "connect4" ? "Connect4Scene" : "ChessScene"
+          this.scene.start(sceneKey, { room: this.room })
         })
         return
       }

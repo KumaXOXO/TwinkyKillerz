@@ -16,8 +16,11 @@ import {
   CHESS_CORNERS,
   CHESS_PAWN_DIRS,
   CHESS_TURN_MS,
+  CONNECT4_TURN_MS,
+  CONNECT4_COLS,
 } from "../../../shared/constants"
 import { buildInitialBoard, getLegalMoves, hasLegalMoves, isInCheck, applyMove, ChessPieceData } from "../../../shared/chessLogic"
+import { buildBoard, dropPiece, checkWin, isBoardFull, flattenBoard, Board } from "../../../shared/connect4Logic"
 import { WheelField } from "../../../shared/schema"
 import { computeSegmentWeights, pickWeightedIndex } from "../../../shared/wheelLogic"
 
@@ -61,6 +64,8 @@ export class GameRoom extends Room<GameState> {
   private chessPawnDirs: Record<string, number> = {}
   private chessTurnToken = 0
   private chessEliminationOrder: string[] = []
+  private connect4Board: Board = []
+  private connect4TurnToken = 0
 
   onCreate(_options: unknown) {
     this.setState(new GameState())
@@ -85,6 +90,9 @@ export class GameRoom extends Room<GameState> {
     )
     this.onMessage("place_chip", (client, msg: { fieldIndex: number }) =>
       this.handlePlaceChip(client, msg)
+    )
+    this.onMessage("connect4_drop", (client, msg: { col: number }) =>
+      this.handleConnect4Drop(client, msg)
     )
   }
 
@@ -253,6 +261,8 @@ export class GameRoom extends Room<GameState> {
     this.state.phase = "minigame"
     if (this.state.olympiade.currentMinigame === "chess") {
       this.startChessRound()
+    } else if (this.state.olympiade.currentMinigame === "connect4") {
+      this.startConnect4Round()
     }
   }
 
@@ -433,6 +443,94 @@ export class GameRoom extends Room<GameState> {
       if (!player) return
       player.score += SCORE_PLACEMENT[idx] ?? 0
       // Lower placements earn chips to influence next wheel spin
+      const totalPlayers = finishOrder.length
+      if (idx === totalPlayers - 1) player.chips += CHIPS_LAST_PLACE
+      else if (idx === totalPlayers - 2) player.chips += CHIPS_SECOND_LAST
+    })
+  }
+
+  private startConnect4Round() {
+    this.connect4Board = buildBoard()
+    const playerIds = [...this.state.players.keys()]
+
+    this.state.connect4.board.clear()
+    for (const cell of flattenBoard(this.connect4Board)) {
+      this.state.connect4.board.push(cell)
+    }
+
+    this.state.connect4.playerOrder.clear()
+    for (const id of playerIds) this.state.connect4.playerOrder.push(id)
+
+    this.state.connect4.winnerId = ""
+    this.advanceConnect4Turn(playerIds[0])
+  }
+
+  private syncConnect4Board() {
+    const flat = flattenBoard(this.connect4Board)
+    for (let i = 0; i < flat.length; i++) {
+      this.state.connect4.board[i] = flat[i]
+    }
+  }
+
+  private advanceConnect4Turn(playerId: string) {
+    this.state.connect4.turnPlayerId = playerId
+    this.state.connect4.turnDeadline = Date.now() + CONNECT4_TURN_MS
+    const token = ++this.connect4TurnToken
+    this.clock.setTimeout(() => {
+      if (token !== this.connect4TurnToken) return
+      if (this.state.phase !== "minigame") return
+      this.advanceToNextConnect4Player(playerId)
+    }, CONNECT4_TURN_MS)
+  }
+
+  private advanceToNextConnect4Player(currentId: string) {
+    const order = [...this.state.connect4.playerOrder]
+    const idx = order.indexOf(currentId)
+    const nextId = order[(idx + 1) % order.length]
+    this.advanceConnect4Turn(nextId)
+  }
+
+  private handleConnect4Drop(client: Client, msg: { col: number }) {
+    if (this.state.phase !== "minigame") return
+    if (this.state.olympiade.currentMinigame !== "connect4") return
+    if (client.sessionId !== this.state.connect4.turnPlayerId) return
+
+    const col = Math.floor(msg.col)
+    if (col < 0 || col >= CONNECT4_COLS) return
+
+    const result = dropPiece(this.connect4Board, col, client.sessionId)
+    if (!result) return
+
+    this.syncConnect4Board()
+
+    if (checkWin(this.connect4Board, result.row, result.col, client.sessionId)) {
+      this.endConnect4Round(client.sessionId)
+      return
+    }
+
+    if (isBoardFull(this.connect4Board)) {
+      this.endConnect4Round(null)
+      return
+    }
+
+    this.advanceToNextConnect4Player(client.sessionId)
+  }
+
+  private endConnect4Round(winnerId: string | null) {
+    this.state.connect4.winnerId = winnerId ?? ""
+    this.state.phase = "result"
+
+    const playerIds = [...this.state.connect4.playerOrder]
+    const finishOrder: string[] = []
+    if (winnerId) finishOrder.push(winnerId)
+    for (const id of playerIds) {
+      if (id !== winnerId) finishOrder.push(id)
+    }
+
+    finishOrder.forEach((pid, idx) => {
+      const player = this.state.players.get(pid)
+      if (!player) return
+      player.score += SCORE_PLACEMENT[idx] ?? 0
       const totalPlayers = finishOrder.length
       if (idx === totalPlayers - 1) player.chips += CHIPS_LAST_PLACE
       else if (idx === totalPlayers - 2) player.chips += CHIPS_SECOND_LAST

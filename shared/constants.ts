@@ -12,8 +12,12 @@ export const SCORE_PLACEMENT = [3, 2, 1, 0] as const
 export const SCORE_CHEAT_CAUGHT = -1
 export const SCORE_CHEAT_SUCCESS = 1
 
-export const MINIGAMES = ["chess"] as const
+export const MINIGAMES = ["chess", "connect4"] as const
 export type Minigame = (typeof MINIGAMES)[number]
+
+export const CONNECT4_COLS = 7
+export const CONNECT4_ROWS = 6
+export const CONNECT4_TURN_MS = 20_000
 
 export type GamePhase = "lobby" | "wheel" | "minigame" | "result" | "gameover"
 

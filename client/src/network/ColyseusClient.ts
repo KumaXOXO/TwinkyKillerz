@@ -58,3 +58,7 @@ export function sendTransferGamemaster(targetId: string): void {
 export function sendPlaceChip(fieldIndex: number): void {
   _room?.send("place_chip", { fieldIndex })
 }
+
+export function sendConnect4Drop(col: number): void {
+  _room?.send("connect4_drop", { col })
+}
