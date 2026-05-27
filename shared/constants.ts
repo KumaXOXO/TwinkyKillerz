@@ -1,5 +1,8 @@
 export const MAX_ROUNDS = 10
 export const CHEAT_WINDOW_MS = 1500
+export const WHEEL_PLACEMENT_MS = 12_000
+export const CHIPS_LAST_PLACE = 2
+export const CHIPS_SECOND_LAST = 1
 export const WHEEL_MIN_VELOCITY = 600
 export const WHEEL_MAX_VELOCITY = 1200
 export const WHEEL_ARROW_INFLUENCE = 0.05

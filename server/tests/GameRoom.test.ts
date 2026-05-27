@@ -178,11 +178,11 @@ describe("GameRoom round management", () => {
   it("transitions to gameover after MAX_ROUNDS", () => {
     const room = makeRoom()
     room.state.olympiade.currentRound = MAX_ROUNDS
-    room["startNewRound"]()
+    room["startPlacementPhase"]()
     expect(room.state.phase).toBe("gameover")
   })
 
-  it("wheelSpinnerId is set to a valid player on round start", () => {
+  it("wheelSpinnerId is set to a valid player after placement phase ends", () => {
     const room = makeRoom()
     const c1 = makeClient("p1")
     const c2 = makeClient("p2")
@@ -190,12 +190,14 @@ describe("GameRoom round management", () => {
     room.onJoin(c2, { name: "Bob", characterId: "b" })
     room["handlePlayerReady"](c1, {})
     room["handlePlayerReady"](c2, {})
+    // Simulate placement phase ending
+    room["startNewRound"]()
     expect(["p1", "p2"]).toContain(room.state.olympiade.wheel.spinnerId)
   })
 })
 
 describe("GameRoom wheel mechanics", () => {
-  it("sets wheelVelocity within [WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY] on round start", () => {
+  function startWheelReady() {
     const room = makeRoom()
     const c1 = makeClient("p1")
     const c2 = makeClient("p2")
@@ -203,18 +205,19 @@ describe("GameRoom wheel mechanics", () => {
     room.onJoin(c2, { name: "Bob", characterId: "b" })
     room["handlePlayerReady"](c1, {})
     room["handlePlayerReady"](c2, {})
+    // Skip placement phase
+    room["startNewRound"]()
+    return { room, c1, c2 }
+  }
+
+  it("sets wheelVelocity within [WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY] after placement phase", () => {
+    const { room } = startWheelReady()
     expect(room.state.olympiade.wheel.velocity).toBeGreaterThanOrEqual(WHEEL_MIN_VELOCITY)
     expect(room.state.olympiade.wheel.velocity).toBeLessThanOrEqual(WHEEL_MAX_VELOCITY)
   })
 
   it("transitions phase to 'minigame' when spinner sends wheel_done", () => {
-    const room = makeRoom()
-    const c1 = makeClient("p1")
-    const c2 = makeClient("p2")
-    room.onJoin(c1, { name: "Alice", characterId: "a" })
-    room.onJoin(c2, { name: "Bob", characterId: "b" })
-    room["handlePlayerReady"](c1, {})
-    room["handlePlayerReady"](c2, {})
+    const { room, c1, c2 } = startWheelReady()
     expect(room.state.phase).toBe("wheel")
 
     const origNow = Date.now
@@ -228,26 +231,14 @@ describe("GameRoom wheel mechanics", () => {
   })
 
   it("ignores wheel_done sent too early (before min spin time)", () => {
-    const room = makeRoom()
-    const c1 = makeClient("p1")
-    const c2 = makeClient("p2")
-    room.onJoin(c1, { name: "Alice", characterId: "a" })
-    room.onJoin(c2, { name: "Bob", characterId: "b" })
-    room["handlePlayerReady"](c1, {})
-    room["handlePlayerReady"](c2, {})
+    const { room, c1, c2 } = startWheelReady()
     const spinnerClient = room.state.olympiade.wheel.spinnerId === c1.sessionId ? c1 : c2
     room["handleWheelDone"](spinnerClient, {})
     expect(room.state.phase).toBe("wheel")
   })
 
   it("ignores wheel_done from non-spinner", () => {
-    const room = makeRoom()
-    const c1 = makeClient("p1")
-    const c2 = makeClient("p2")
-    room.onJoin(c1, { name: "Alice", characterId: "a" })
-    room.onJoin(c2, { name: "Bob", characterId: "b" })
-    room["handlePlayerReady"](c1, {})
-    room["handlePlayerReady"](c2, {})
+    const { room, c1, c2 } = startWheelReady()
     const nonSpinnerClient = room.state.olympiade.wheel.spinnerId === c1.sessionId ? c2 : c1
     room["handleWheelDone"](nonSpinnerClient, {})
     expect(room.state.phase).toBe("wheel")

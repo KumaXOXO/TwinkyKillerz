@@ -2,9 +2,16 @@ import Phaser from "phaser"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 import { MINIGAMES, WHEEL_ARROW_INFLUENCE, WHEEL_BASE_DECEL } from "@twinky/shared/constants"
-import { sendWheelDone } from "../network/ColyseusClient"
+import { computeSegmentWeights } from "@twinky/shared/wheelLogic"
+import { sendWheelDone, sendPlaceChip } from "../network/ColyseusClient"
 
 const RADIUS = 200
+const C = {
+  text: "#e8d5ff",
+  muted: "#7070a0",
+  crown: "#ffcc44",
+  chip: "#44ff88",
+}
 
 export class WheelScene extends Phaser.Scene {
   private room!: Room<GameState>
@@ -17,6 +24,12 @@ export class WheelScene extends Phaser.Scene {
   private isDone = false
   private stateChangeCallback: ((state: GameState) => void) | null = null
   private spaceHandler: (() => void) | null = null
+  private placementTexts: Phaser.GameObjects.Text[] = []
+  private chipsText!: Phaser.GameObjects.Text
+  private timerText!: Phaser.GameObjects.Text
+  private statusText!: Phaser.GameObjects.Text
+  private resultText!: Phaser.GameObjects.Text
+  private inPlacementPhase = false
 
   constructor() {
     super({ key: "WheelScene" })
@@ -29,14 +42,24 @@ export class WheelScene extends Phaser.Scene {
     this.decelMult = 1.0
     this.isSpinning = false
     this.isDone = false
+    this.inPlacementPhase = false
+    this.placementTexts = []
   }
 
   create() {
     const { width, height } = this.scale
-    const segments = [...MINIGAMES]
+
+    this.add
+      .text(width / 2, 36, "SPIN THE WHEEL", { fontSize: "24px", color: C.text, fontStyle: "bold" })
+      .setOrigin(0.5)
+
+    const round = this.room.state.olympiade.currentRound
+    this.add
+      .text(width / 2, 64, `Round ${round}`, { fontSize: "14px", color: C.muted })
+      .setOrigin(0.5)
 
     this.wheelContainer = this.add.container(width / 2, height / 2)
-    this.buildWheel(segments)
+    this.buildWheel()
 
     const arrow = this.add.graphics()
     arrow.fillStyle(0xff4444)
@@ -46,41 +69,29 @@ export class WheelScene extends Phaser.Scene {
       width / 2 + 12, height / 2 - RADIUS - 34,
     )
 
-    this.add
-      .text(width / 2, 36, "SPIN THE WHEEL", { fontSize: "24px", color: "#aa77ff", fontStyle: "bold" })
+    this.statusText = this.add
+      .text(width / 2, height / 2 + RADIUS + 50, "", { fontSize: "18px", color: C.text })
       .setOrigin(0.5)
 
-    const spinnerName = this.room.state.players.get(this.room.state.olympiade.wheel.spinnerId)?.name ?? "?"
-    const isSpinner = this.room.state.olympiade.wheel.spinnerId === this.room.sessionId
-
-    const statusText = this.add
-      .text(
-        width / 2,
-        height / 2 + RADIUS + 50,
-        isSpinner ? "Press SPACE to spin!" : `Waiting for ${spinnerName} to spin...`,
-        { fontSize: "18px", color: "#e8d5ff" },
-      )
+    this.timerText = this.add
+      .text(width / 2, height / 2 + RADIUS + 80, "", { fontSize: "14px", color: C.muted })
       .setOrigin(0.5)
 
-    const resultText = this.add
-      .text(width / 2, height / 2 + RADIUS + 90, "", {
-        fontSize: "22px",
-        color: "#ffcc44",
-        fontStyle: "bold",
-      })
+    this.chipsText = this.add
+      .text(width / 2, height / 2 + RADIUS + 108, "", { fontSize: "14px", color: C.chip })
+      .setOrigin(0.5)
+
+    this.resultText = this.add
+      .text(width / 2, height / 2 + RADIUS + 90, "", { fontSize: "22px", color: C.crown, fontStyle: "bold" })
       .setOrigin(0.5)
 
     this.cursors = this.input.keyboard!.createCursorKeys()
 
-    if (isSpinner) {
-      this.spaceHandler = () => {
-        const v = this.room.state.olympiade.wheel.velocity
-        if (v <= 0) return
-        this.velocity = v
-        this.isSpinning = true
-        statusText.setText("Left/right arrows to influence")
-      }
-      this.input.keyboard!.once("keydown-SPACE", this.spaceHandler)
+    this.inPlacementPhase = this.room.state.olympiade.wheel.placementPhase
+    if (this.inPlacementPhase) {
+      this.buildPlacementUI()
+    } else {
+      this.buildSpinUI()
     }
 
     this.stateChangeCallback = (state) => {
@@ -89,16 +100,40 @@ export class WheelScene extends Phaser.Scene {
           this.room.onStateChange.remove(this.stateChangeCallback)
           this.stateChangeCallback = null
         }
-        resultText.setText(`Next: ${state.olympiade.currentMinigame.toUpperCase()}!`)
+        this.resultText.setText(`Next: ${state.olympiade.currentMinigame.toUpperCase()}!`)
+        this.timerText.setText("")
+        this.chipsText.setText("")
+        this.statusText.setText("")
         this.time.delayedCall(500, () => {
           this.scene.start("ChessScene", { room: this.room })
         })
+        return
+      }
+      if (this.inPlacementPhase && !state.olympiade.wheel.placementPhase) {
+        this.inPlacementPhase = false
+        this.clearPlacementUI()
+        this.buildSpinUI()
+        this.rebuildWheel()
+        return
+      }
+      if (this.inPlacementPhase) {
+        this.refreshPlacementUI()
+        this.rebuildWheel()
       }
     }
     this.room.onStateChange(this.stateChangeCallback)
   }
 
   update(_time: number, delta: number) {
+    if (this.inPlacementPhase) {
+      const remaining = Math.max(
+        0,
+        Math.ceil((this.room.state.olympiade.wheel.placementDeadline - Date.now()) / 1000),
+      )
+      this.timerText?.setText(`${remaining}s remaining`)
+      return
+    }
+
     if (!this.isSpinning || this.isDone) return
 
     if (this.cursors.left.isDown) {
@@ -135,49 +170,142 @@ export class WheelScene extends Phaser.Scene {
     }
   }
 
-  private buildWheel(segments: readonly string[]) {
-    const g = this.add.graphics()
-    const n = segments.length
-    const segAngle = (Math.PI * 2) / n
-    const palette = [0x2d1b4e, 0x1e3a5f, 0x4e1b2d]
+  private buildPlacementUI() {
+    const myChips = this.room.state.players.get(this.room.sessionId)?.chips ?? 0
+    const { width, height } = this.scale
 
-    for (let i = 0; i < n; i++) {
-      const start = i * segAngle - Math.PI / 2
-      const end = (i + 1) * segAngle - Math.PI / 2
+    if (myChips > 0) {
+      this.statusText.setText("Place your chips on wheel segments!")
+      this.chipsText.setText(`You have ${myChips} chip${myChips !== 1 ? "s" : ""}`)
+    } else {
+      this.statusText.setText("Waiting for chip placement...")
+      this.chipsText.setText("")
+    }
+
+    const games = [...MINIGAMES] as string[]
+    const startY = height / 2 + RADIUS + 138
+    games.forEach((game, idx) => {
+      const chips = this.room.state.olympiade.wheel.fields.get(game)?.fixedChips ?? 0
+      const prefix = myChips > 0 ? `[${idx + 1}] ` : ""
+      const line = `${prefix}${game.toUpperCase()}  (${chips} chip${chips !== 1 ? "s" : ""})`
+      const t = this.add
+        .text(width / 2, startY + idx * 22, line, { fontSize: "13px", color: C.text })
+        .setOrigin(0.5)
+      this.placementTexts.push(t)
+
+      if (myChips > 0) {
+        this.input.keyboard?.on(`keydown-${idx + 1}`, () => sendPlaceChip(idx))
+      }
+    })
+  }
+
+  private clearPlacementUI() {
+    for (const t of this.placementTexts) t.destroy()
+    this.placementTexts = []
+    // Remove digit key listeners
+    const games = [...MINIGAMES] as string[]
+    games.forEach((_g, idx) => {
+      this.input.keyboard?.removeAllListeners(`keydown-${idx + 1}`)
+    })
+  }
+
+  private refreshPlacementUI() {
+    const myChips = this.room.state.players.get(this.room.sessionId)?.chips ?? 0
+    const games = [...MINIGAMES] as string[]
+
+    this.chipsText?.setText(
+      myChips > 0 ? `You have ${myChips} chip${myChips !== 1 ? "s" : ""}` : "",
+    )
+    this.statusText?.setText(
+      myChips > 0 ? "Place your chips on wheel segments!" : "Waiting for chip placement...",
+    )
+
+    games.forEach((game, idx) => {
+      const chips = this.room.state.olympiade.wheel.fields.get(game)?.fixedChips ?? 0
+      const t = this.placementTexts[idx]
+      if (!t) return
+      const prefix = myChips > 0 ? `[${idx + 1}] ` : ""
+      t.setText(`${prefix}${game.toUpperCase()}  (${chips} chip${chips !== 1 ? "s" : ""})`)
+    })
+  }
+
+  private buildSpinUI() {
+    const spinnerName =
+      this.room.state.players.get(this.room.state.olympiade.wheel.spinnerId)?.name ?? "?"
+    const isSpinner = this.room.state.olympiade.wheel.spinnerId === this.room.sessionId
+
+    this.statusText?.setText(
+      isSpinner ? "Press SPACE to spin!" : `Waiting for ${spinnerName} to spin...`,
+    )
+    this.timerText?.setText(isSpinner ? "← → to influence speed" : "")
+    this.chipsText?.setText("")
+
+    if (isSpinner) {
+      this.spaceHandler = () => {
+        const v = this.room.state.olympiade.wheel.velocity
+        if (v <= 0) return
+        this.velocity = v
+        this.isSpinning = true
+        this.timerText?.setText("← → to influence speed")
+      }
+      this.input.keyboard!.once("keydown-SPACE", this.spaceHandler)
+    }
+  }
+
+  private buildWheel() {
+    this.wheelContainer.removeAll(true)
+    const segments = [...MINIGAMES] as string[]
+    const chips = segments.map(g => this.room.state.olympiade.wheel.fields.get(g)?.fixedChips ?? 0)
+    const weights = computeSegmentWeights(segments.length, chips)
+    const total = weights.reduce((s, w) => s + w, 0)
+
+    const g = this.add.graphics()
+    const palette = [0x2d1b4e, 0x1e3a5f, 0x4e1b2d, 0x1b4e2d, 0x4e3a1b]
+    let startAngle = -Math.PI / 2
+
+    segments.forEach((game, i) => {
+      const arc = (weights[i] / total) * Math.PI * 2
+      const end = startAngle + arc
+
       g.fillStyle(palette[i % palette.length])
-      g.slice(0, 0, RADIUS, start, end, false)
+      g.slice(0, 0, RADIUS, startAngle, end, false)
       g.fillPath()
 
       g.lineStyle(2, 0x7744cc)
       g.beginPath()
       g.moveTo(0, 0)
-      g.lineTo(Math.cos(start) * RADIUS, Math.sin(start) * RADIUS)
+      g.lineTo(Math.cos(startAngle) * RADIUS, Math.sin(startAngle) * RADIUS)
       g.strokePath()
-    }
+
+      const mid = startAngle + arc / 2
+      const pct = Math.round((weights[i] / total) * 100)
+      const label = this.add
+        .text(
+          Math.cos(mid) * (RADIUS * 0.6),
+          Math.sin(mid) * (RADIUS * 0.6),
+          `${game.toUpperCase()}\n${pct}%`,
+          { fontSize: "14px", color: "#e8d5ff", fontStyle: "bold", align: "center" },
+        )
+        .setOrigin(0.5)
+      this.wheelContainer.add(label)
+
+      startAngle = end
+    })
 
     g.lineStyle(3, 0xaa66ff)
     g.strokeCircle(0, 0, RADIUS)
     g.fillStyle(0x0d0d1a)
     g.fillCircle(0, 0, 18)
 
-    this.wheelContainer.add(g)
+    this.wheelContainer.addAt(g, 0)
+  }
 
-    for (let i = 0; i < n; i++) {
-      const mid = (i + 0.5) * segAngle - Math.PI / 2
-      const label = this.add
-        .text(
-          Math.cos(mid) * (RADIUS * 0.6),
-          Math.sin(mid) * (RADIUS * 0.6),
-          segments[i].toUpperCase(),
-          { fontSize: "18px", color: "#e8d5ff", fontStyle: "bold" },
-        )
-        .setOrigin(0.5)
-      this.wheelContainer.add(label)
-    }
+  private rebuildWheel() {
+    this.buildWheel()
   }
 
   private onWheelStopped() {
-    const segments = [...MINIGAMES]
+    const segments = [...MINIGAMES] as string[]
     const desiredIdx = segments.indexOf(
       this.room.state.olympiade.currentMinigame as (typeof MINIGAMES)[number],
     )

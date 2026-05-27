@@ -54,3 +54,7 @@ export function sendGamemasterSettings(maxPlayers?: number, gameMode?: string): 
 export function sendTransferGamemaster(targetId: string): void {
   _room?.send("transfer_gamemaster", { targetId })
 }
+
+export function sendPlaceChip(fieldIndex: number): void {
+  _room?.send("place_chip", { fieldIndex })
+}

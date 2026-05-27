@@ -60,7 +60,7 @@ export class LobbyScene extends Phaser.Scene {
   private buildNameInputScreen() {
     const { width, height } = this.scale
     this.add
-      .text(width / 2, height / 2 - 120, "TWINKY KILLERZ", { fontSize: "40px", color: C.text, fontStyle: "bold" })
+      .text(width / 2, height / 2 - 120, "TWINKY GAMES", { fontSize: "40px", color: C.text, fontStyle: "bold" })
       .setOrigin(0.5)
     this.add
       .text(width / 2, height / 2 - 40, "Enter your name:", { fontSize: "18px", color: C.muted })
@@ -82,7 +82,7 @@ export class LobbyScene extends Phaser.Scene {
 
   private buildLobbyScreen() {
     const { width } = this.scale
-    this.add.text(20, 16, "TWINKY KILLERZ", { fontSize: "20px", color: C.text, fontStyle: "bold" })
+    this.add.text(20, 16, "TWINKY GAMES", { fontSize: "20px", color: C.text, fontStyle: "bold" })
     this.roomCodeText = this.add.text(width - 20, 16, "", { fontSize: "20px", color: C.crown }).setOrigin(1, 0)
     this.add.rectangle(170, 290, 300, 430, C.panel).setStrokeStyle(1, C.border)
     this.add.text(170, 65, "PLAYERS", { fontSize: "12px", color: C.muted }).setOrigin(0.5)
@@ -108,7 +108,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private refreshLobbyUI() {
-    if (!this.room) return
+    if (!this.room?.state?.players) return
     const state = this.room.state
     const me = state.players.get(this.room.sessionId)
 
@@ -128,7 +128,7 @@ export class LobbyScene extends Phaser.Scene {
     this.chatLogText?.setText(chatLines.join("\n"))
 
     if (me?.isGamemaster) {
-      this.settingsText?.setText(`[</> players: ${state.maxPlayers}   [M] mode: ${state.gameMode.toUpperCase()}`)
+      this.settingsText?.setText(`[←/→] players: ${state.maxPlayers}   [M] mode: ${state.gameMode.toUpperCase()}`)
     } else {
       this.settingsText?.setText(`Mode: ${state.gameMode.toUpperCase()}   Players: ${state.maxPlayers}`)
     }
@@ -226,8 +226,9 @@ export class LobbyScene extends Phaser.Scene {
       this.room = await joinGame(name, "default")
       this.uiPhase = "lobby"
       this.children.removeAll(true)
-      this.buildLobbyScreen()
       this.setupStateSync()
+      this.buildLobbyScreen()
+      this.time.delayedCall(150, () => this.refreshLobbyUI())
     } catch {
       this.nameHintText?.setText("Connection failed — is the server running?")
     }

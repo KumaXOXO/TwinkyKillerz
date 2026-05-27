@@ -39,6 +39,8 @@ export class WheelState extends Schema {
   @type("string") spinnerId: string = ""
   @type("number") velocity: number = 0
   @type({ map: WheelField }) fields = new MapSchema<WheelField>()
+  @type("boolean") placementPhase: boolean = false
+  @type("number") placementDeadline: number = 0
 }
 
 export class OlympiadeState extends Schema {
@@ -52,6 +54,7 @@ export class PlayerState extends Schema {
   @type("string") name: string = ""
   @type("string") characterId: string = ""
   @type("number") score: number = 0
+  @type("number") chips: number = 0
   @type("boolean") isConnected: boolean = true
   @type("boolean") isReady: boolean = false
   @type("boolean") isGamemaster: boolean = false

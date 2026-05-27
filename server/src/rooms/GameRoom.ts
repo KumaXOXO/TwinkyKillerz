@@ -10,11 +10,16 @@ import {
   WHEEL_MIN_VELOCITY,
   WHEEL_MAX_VELOCITY,
   WHEEL_BASE_DECEL,
+  WHEEL_PLACEMENT_MS,
+  CHIPS_LAST_PLACE,
+  CHIPS_SECOND_LAST,
   CHESS_CORNERS,
   CHESS_PAWN_DIRS,
   CHESS_TURN_MS,
 } from "../../../shared/constants"
 import { buildInitialBoard, getLegalMoves, hasLegalMoves, isInCheck, applyMove, ChessPieceData } from "../../../shared/chessLogic"
+import { WheelField } from "../../../shared/schema"
+import { computeSegmentWeights, pickWeightedIndex } from "../../../shared/wheelLogic"
 
 interface JoinOptions {
   name: string
@@ -78,6 +83,9 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("transfer_gamemaster", (client, msg: TransferGamemasterMsg) =>
       this.handleTransferGamemaster(client, msg)
     )
+    this.onMessage("place_chip", (client, msg: { fieldIndex: number }) =>
+      this.handlePlaceChip(client, msg)
+    )
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -112,7 +120,7 @@ export class GameRoom extends Room<GameState> {
     if (allReady) {
       this.readyPlayers.clear()
       for (const p of this.state.players.values()) p.isReady = false
-      this.startNewRound()
+      this.startPlacementPhase()
     }
   }
 
@@ -176,25 +184,65 @@ export class GameRoom extends Room<GameState> {
     this.broadcast("cheat_caught", { catcherId: client.sessionId, targetId: msg.targetId })
   }
 
-  private startNewRound() {
+  private startPlacementPhase() {
     this.state.olympiade.currentRound++
     if (this.state.olympiade.currentRound > MAX_ROUNDS) {
       this.state.phase = "gameover"
       return
     }
+    // Reset field chips for this round
+    for (const field of this.state.olympiade.wheel.fields.values()) {
+      field.fixedChips = 0
+    }
+    // Ensure fields exist for each minigame
+    for (const game of MINIGAMES) {
+      if (!this.state.olympiade.wheel.fields.has(game)) {
+        const f = new WheelField()
+        f.minigame = game
+        f.fixedChips = 0
+        this.state.olympiade.wheel.fields.set(game, f)
+      }
+    }
+    this.state.olympiade.wheel.placementPhase = true
+    this.state.olympiade.wheel.placementDeadline = Date.now() + WHEEL_PLACEMENT_MS
     this.state.phase = "wheel"
-    this.state.olympiade.wheel.velocity =
-      WHEEL_MIN_VELOCITY + Math.random() * (WHEEL_MAX_VELOCITY - WHEEL_MIN_VELOCITY)
-    this.wheelSpinStartTime = Date.now()
+    this.clock.setTimeout(() => this.startNewRound(), WHEEL_PLACEMENT_MS)
+  }
+
+  private startNewRound() {
+    this.state.olympiade.wheel.placementPhase = false
+    // Pick minigame using chip weights
+    const games = [...MINIGAMES] as string[]
+    const chips = games.map(g => this.state.olympiade.wheel.fields.get(g)?.fixedChips ?? 0)
+    const weights = computeSegmentWeights(games.length, chips)
+    const idx = pickWeightedIndex(weights)
+    this.state.olympiade.currentMinigame = games[idx] ?? games[0]
+    // Pick spinner (not same as last)
     const ids = [...this.state.players.keys()]
     const otherIds = ids.filter((id) => id !== this.state.olympiade.wheel.spinnerId)
     const pool = otherIds.length > 0 ? otherIds : ids
     this.state.olympiade.wheel.spinnerId = pool[Math.floor(Math.random() * pool.length)]
-    this.state.olympiade.currentMinigame = MINIGAMES[Math.floor(Math.random() * MINIGAMES.length)]
+    this.state.olympiade.wheel.velocity =
+      WHEEL_MIN_VELOCITY + Math.random() * (WHEEL_MAX_VELOCITY - WHEEL_MIN_VELOCITY)
+    this.wheelSpinStartTime = Date.now()
     this.broadcast("round_started", {
       round: this.state.olympiade.currentRound,
       spinnerId: this.state.olympiade.wheel.spinnerId,
     })
+  }
+
+  private handlePlaceChip(client: Client, msg: { fieldIndex: number }) {
+    if (!this.state.olympiade.wheel.placementPhase) return
+    if (Date.now() > this.state.olympiade.wheel.placementDeadline) return
+    const player = this.state.players.get(client.sessionId)
+    if (!player || player.chips <= 0) return
+    const games = [...MINIGAMES] as string[]
+    const targetGame = games[msg.fieldIndex]
+    if (!targetGame) return
+    const field = this.state.olympiade.wheel.fields.get(targetGame)
+    if (!field) return
+    player.chips--
+    field.fixedChips++
   }
 
   private handleWheelDone(client: Client, _msg: unknown) {
@@ -382,7 +430,12 @@ export class GameRoom extends Room<GameState> {
     }
     finishOrder.forEach((pid, idx) => {
       const player = this.state.players.get(pid)
-      if (player) player.score += SCORE_PLACEMENT[idx] ?? 0
+      if (!player) return
+      player.score += SCORE_PLACEMENT[idx] ?? 0
+      // Lower placements earn chips to influence next wheel spin
+      const totalPlayers = finishOrder.length
+      if (idx === totalPlayers - 1) player.chips += CHIPS_LAST_PLACE
+      else if (idx === totalPlayers - 2) player.chips += CHIPS_SECOND_LAST
     })
   }
 }
