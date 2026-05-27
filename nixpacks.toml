@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["cd server && npm install"]
+cmds = ["cd shared && npm install", "cd server && npm install"]
 
 [start]
 cmd = "cd server && npx tsx src/index.ts"

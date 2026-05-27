@@ -2,6 +2,9 @@
   "name": "@twinky/shared",
   "version": "1.0.0",
   "type": "module",
+  "dependencies": {
+    "@colyseus/schema": "^2.0.4"
+  },
   "exports": {
     "./schema": "./schema.ts",
     "./constants": "./constants.ts",
