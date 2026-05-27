@@ -1,5 +1,5 @@
 import { Room, Client } from "@colyseus/core"
-import { GameState, PlayerState, CheatEvent, ChessPiece } from "../../../shared/schema"
+import { GameState, PlayerState, CheatEvent, ChessPiece, ChatMessage } from "../../../shared/schema"
 import {
   CHEAT_WINDOW_MS,
   MAX_ROUNDS,
@@ -28,6 +28,15 @@ interface CatchCheatMsg {
   targetId: string
 }
 
+interface ChatMsg {
+  text: string
+}
+
+function generateRoomCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("")
+}
+
 export class GameRoom extends Room<GameState> {
   maxClients = 4
   private readyPlayers = new Set<string>()
@@ -39,6 +48,7 @@ export class GameRoom extends Room<GameState> {
 
   onCreate(_options: unknown) {
     this.setState(new GameState())
+    this.state.roomCode = generateRoomCode()
     this.onMessage("player_ready", (client, msg) => this.handlePlayerReady(client, msg))
     this.onMessage("cheat_attempt", (client, msg: CheatAttemptMsg) =>
       this.handleCheatAttempt(client, msg)
@@ -50,6 +60,7 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("chess_move", (client, msg: { fromRow: number; fromCol: number; toRow: number; toCol: number }) =>
       this.handleChessMove(client, msg)
     )
+    this.onMessage("chat", (client, msg: ChatMsg) => this.handleChat(client, msg))
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -57,18 +68,24 @@ export class GameRoom extends Room<GameState> {
     player.id = client.sessionId
     player.name = options.name ?? "Player"
     player.characterId = options.characterId ?? "default"
+    player.isGamemaster = this.state.players.size === 0
     this.state.players.set(client.sessionId, player)
   }
 
   onLeave(client: Client, _consented: boolean) {
     const player = this.state.players.get(client.sessionId)
-    if (player) player.isConnected = false
+    if (player) {
+      player.isConnected = false
+      player.isReady = false
+    }
     this.readyPlayers.delete(client.sessionId)
   }
 
   onDispose() {}
 
   private handlePlayerReady(client: Client, _msg: unknown) {
+    const player = this.state.players.get(client.sessionId)
+    if (player) player.isReady = true
     this.readyPlayers.add(client.sessionId)
     const connectedIds = [...this.state.players.values()]
       .filter((p) => p.isConnected)
@@ -77,7 +94,21 @@ export class GameRoom extends Room<GameState> {
       connectedIds.length >= 2 && connectedIds.every((id) => this.readyPlayers.has(id))
     if (allReady) {
       this.readyPlayers.clear()
+      for (const p of this.state.players.values()) p.isReady = false
       this.startNewRound()
+    }
+  }
+
+  private handleChat(client: Client, msg: ChatMsg) {
+    const text = String(msg.text ?? "").trim().slice(0, 200)
+    if (!text) return
+    const message = new ChatMessage()
+    message.playerId = client.sessionId
+    message.text = text
+    message.timestamp = Date.now()
+    this.state.chatMessages.push(message)
+    if (this.state.chatMessages.length > 50) {
+      this.state.chatMessages.splice(0, 1)
     }
   }
 
@@ -106,33 +137,33 @@ export class GameRoom extends Room<GameState> {
   }
 
   private startNewRound() {
-    this.state.currentRound++
-    if (this.state.currentRound > MAX_ROUNDS) {
+    this.state.olympiade.currentRound++
+    if (this.state.olympiade.currentRound > MAX_ROUNDS) {
       this.state.phase = "gameover"
       return
     }
     this.state.phase = "wheel"
-    this.state.wheelVelocity =
+    this.state.olympiade.wheel.velocity =
       WHEEL_MIN_VELOCITY + Math.random() * (WHEEL_MAX_VELOCITY - WHEEL_MIN_VELOCITY)
     this.wheelSpinStartTime = Date.now()
     const ids = [...this.state.players.keys()]
-    const otherIds = ids.filter((id) => id !== this.state.wheelSpinnerId)
+    const otherIds = ids.filter((id) => id !== this.state.olympiade.wheel.spinnerId)
     const pool = otherIds.length > 0 ? otherIds : ids
-    this.state.wheelSpinnerId = pool[Math.floor(Math.random() * pool.length)]
-    this.state.currentMinigame = MINIGAMES[Math.floor(Math.random() * MINIGAMES.length)]
+    this.state.olympiade.wheel.spinnerId = pool[Math.floor(Math.random() * pool.length)]
+    this.state.olympiade.currentMinigame = MINIGAMES[Math.floor(Math.random() * MINIGAMES.length)]
     this.broadcast("round_started", {
-      round: this.state.currentRound,
-      spinnerId: this.state.wheelSpinnerId,
+      round: this.state.olympiade.currentRound,
+      spinnerId: this.state.olympiade.wheel.spinnerId,
     })
   }
 
   private handleWheelDone(client: Client, _msg: unknown) {
-    if (client.sessionId !== this.state.wheelSpinnerId) return
+    if (client.sessionId !== this.state.olympiade.wheel.spinnerId) return
     if (this.state.phase !== "wheel") return
-    const minSpinMs = (this.state.wheelVelocity / WHEEL_BASE_DECEL) * 1000
+    const minSpinMs = (this.state.olympiade.wheel.velocity / WHEEL_BASE_DECEL) * 1000
     if (Date.now() - this.wheelSpinStartTime < minSpinMs) return
     this.state.phase = "minigame"
-    if (this.state.currentMinigame === "chess") {
+    if (this.state.olympiade.currentMinigame === "chess") {
       this.startChessRound()
     }
   }
@@ -170,27 +201,26 @@ export class GameRoom extends Room<GameState> {
       this.chessPawnDirs[id] = CHESS_PAWN_DIRS[corner]
     })
 
-    this.state.chessPlayerOrder.clear()
-    playerIds.forEach(id => this.state.chessPlayerOrder.push(id))
+    this.state.chess.playerOrder.clear()
+    playerIds.forEach(id => this.state.chess.playerOrder.push(id))
 
-    this.state.chessEliminatedIds.clear()
+    this.state.chess.eliminatedIds.clear()
 
     this.syncChessBoard()
-
     this.advanceChessTurn(playerIds[0])
   }
 
   private syncChessBoard() {
-    for (const id of [...this.state.chessPieces.keys()]) {
+    for (const id of [...this.state.chess.pieces.keys()]) {
       if (!this.chessPiecesData.find(p => p.id === id)) {
-        this.state.chessPieces.delete(id)
+        this.state.chess.pieces.delete(id)
       }
     }
     for (const data of this.chessPiecesData) {
-      let piece = this.state.chessPieces.get(data.id)
+      let piece = this.state.chess.pieces.get(data.id)
       if (!piece) {
         piece = new ChessPiece()
-        this.state.chessPieces.set(data.id, piece)
+        this.state.chess.pieces.set(data.id, piece)
       }
       piece.id = data.id
       piece.pieceType = data.pieceType
@@ -202,8 +232,8 @@ export class GameRoom extends Room<GameState> {
   }
 
   private advanceChessTurn(playerId: string) {
-    this.state.chessTurnPlayerId = playerId
-    this.state.chessTurnDeadline = Date.now() + CHESS_TURN_MS
+    this.state.chess.turnPlayerId = playerId
+    this.state.chess.turnDeadline = Date.now() + CHESS_TURN_MS
     this.scheduleTurnTimeout(++this.chessTurnToken, playerId)
   }
 
@@ -228,7 +258,7 @@ export class GameRoom extends Room<GameState> {
     msg: { fromRow: number; fromCol: number; toRow: number; toCol: number }
   ) {
     if (this.state.phase !== "minigame") return
-    if (client.sessionId !== this.state.chessTurnPlayerId) return
+    if (client.sessionId !== this.state.chess.turnPlayerId) return
 
     const movingPiece = this.chessPiecesData.find(
       p => p.row === msg.fromRow && p.col === msg.fromCol && p.ownerId === client.sessionId
@@ -260,7 +290,7 @@ export class GameRoom extends Room<GameState> {
     this.chessPiecesData = this.chessPiecesData.map(p =>
       p.ownerId === playerId ? { ...p, isGhost: true } : p
     )
-    this.state.chessEliminatedIds.push(playerId)
+    this.state.chess.eliminatedIds.push(playerId)
   }
 
   private checkChessWin(): boolean {
@@ -271,11 +301,11 @@ export class GameRoom extends Room<GameState> {
   }
 
   private getActiveChessPlayers(): string[] {
-    return [...this.state.chessPlayerOrder].filter(id => !this.isEliminated(id))
+    return [...this.state.chess.playerOrder].filter(id => !this.isEliminated(id))
   }
 
   private isEliminated(playerId: string): boolean {
-    return this.state.chessEliminatedIds.includes(playerId)
+    return [...this.state.chess.eliminatedIds].includes(playerId)
   }
 
   private endChessRound(winnerId: string | null) {

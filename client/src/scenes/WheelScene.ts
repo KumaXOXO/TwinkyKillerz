@@ -50,8 +50,8 @@ export class WheelScene extends Phaser.Scene {
       .text(width / 2, 36, "SPIN THE WHEEL", { fontSize: "24px", color: "#aa77ff", fontStyle: "bold" })
       .setOrigin(0.5)
 
-    const spinnerName = this.room.state.players.get(this.room.state.wheelSpinnerId)?.name ?? "?"
-    const isSpinner = this.room.state.wheelSpinnerId === this.room.sessionId
+    const spinnerName = this.room.state.players.get(this.room.state.olympiade.wheel.spinnerId)?.name ?? "?"
+    const isSpinner = this.room.state.olympiade.wheel.spinnerId === this.room.sessionId
 
     const statusText = this.add
       .text(
@@ -74,7 +74,7 @@ export class WheelScene extends Phaser.Scene {
 
     if (isSpinner) {
       this.spaceHandler = () => {
-        const v = this.room.state.wheelVelocity
+        const v = this.room.state.olympiade.wheel.velocity
         if (v <= 0) return
         this.velocity = v
         this.isSpinning = true
@@ -89,7 +89,7 @@ export class WheelScene extends Phaser.Scene {
           this.room.onStateChange.remove(this.stateChangeCallback)
           this.stateChangeCallback = null
         }
-        resultText.setText(`Next: ${state.currentMinigame.toUpperCase()}!`)
+        resultText.setText(`Next: ${state.olympiade.currentMinigame.toUpperCase()}!`)
         this.time.delayedCall(500, () => {
           this.scene.start("ChessScene", { room: this.room })
         })
@@ -179,7 +179,7 @@ export class WheelScene extends Phaser.Scene {
   private onWheelStopped() {
     const segments = [...MINIGAMES]
     const desiredIdx = segments.indexOf(
-      this.room.state.currentMinigame as (typeof MINIGAMES)[number],
+      this.room.state.olympiade.currentMinigame as (typeof MINIGAMES)[number],
     )
     const segSize = 360 / segments.length
     const targetAngle = -((desiredIdx + 0.5) * segSize)

@@ -72,7 +72,7 @@ export class ChessScene extends Phaser.Scene {
   }
 
   private buildPawnDirs() {
-    const order = [...this.room.state.chessPlayerOrder] as string[]
+    const order = [...this.room.state.chess.playerOrder] as string[]
     const cornerDirs: number[] = [-1, -1, 1, 1]
     order.forEach((id, idx) => {
       this.pawnDirs[id] = cornerDirs[idx % 4] ?? -1
@@ -80,7 +80,7 @@ export class ChessScene extends Phaser.Scene {
   }
 
   private buildPlayerColors() {
-    const order = [...this.room.state.chessPlayerOrder] as string[]
+    const order = [...this.room.state.chess.playerOrder] as string[]
     order.forEach((id, idx) => {
       this.playerColors[id] = (CHESS_PLAYER_COLORS[idx % 4] as string) ?? "#ffffff"
     })
@@ -88,7 +88,7 @@ export class ChessScene extends Phaser.Scene {
 
   private renderPieces() {
     const currentIds = new Set<string>()
-    this.room.state.chessPieces.forEach((piece: ChessPiece, id: string) => {
+    this.room.state.chess.pieces.forEach((piece: ChessPiece, id: string) => {
       currentIds.add(id)
       const x = BOARD_OFFSET_X + piece.col * CELL_SIZE + CELL_SIZE / 2
       const y = BOARD_OFFSET_Y + piece.row * CELL_SIZE + CELL_SIZE / 2
@@ -120,7 +120,7 @@ export class ChessScene extends Phaser.Scene {
     if (row < 0 || row > 7 || col < 0 || col > 7) return
 
     const myId = this.room.sessionId
-    if (this.room.state.chessTurnPlayerId !== myId) return
+    if (this.room.state.chess.turnPlayerId !== myId) return
 
     const isValidDest = this.validMovesCache.some(([r, c]) => r === row && c === col)
     if (isValidDest && this.selectedPieceId) {
@@ -149,19 +149,19 @@ export class ChessScene extends Phaser.Scene {
 
   private getPieceAtCell(row: number, col: number): ChessPiece | null {
     let found: ChessPiece | null = null
-    this.room.state.chessPieces.forEach((p: ChessPiece) => {
+    this.room.state.chess.pieces.forEach((p: ChessPiece) => {
       if (p.row === row && p.col === col) found = p
     })
     return found
   }
 
   private getPieceDataById(id: string): ChessPiece | null {
-    return this.room.state.chessPieces.get(id) ?? null
+    return this.room.state.chess.pieces.get(id) ?? null
   }
 
   private buildPiecesArray(): ChessPieceData[] {
     const arr: ChessPieceData[] = []
-    this.room.state.chessPieces.forEach((p: ChessPiece, id: string) => {
+    this.room.state.chess.pieces.forEach((p: ChessPiece, id: string) => {
       arr.push({ id, pieceType: p.pieceType, ownerId: p.ownerId, row: p.row, col: p.col, isGhost: p.isGhost })
     })
     return arr
@@ -178,7 +178,7 @@ export class ChessScene extends Phaser.Scene {
   }
 
   private updateTurnText() {
-    const turnId = this.room.state.chessTurnPlayerId
+    const turnId = this.room.state.chess.turnPlayerId
     const myId = this.room.sessionId
     if (turnId === myId) {
       this.turnText.setText("YOUR TURN").setStyle({ color: "#ffff44" })
@@ -190,7 +190,7 @@ export class ChessScene extends Phaser.Scene {
   }
 
   update() {
-    const remaining = Math.max(0, this.room.state.chessTurnDeadline - Date.now())
+    const remaining = Math.max(0, this.room.state.chess.turnDeadline - Date.now())
     this.timerText.setText(`${Math.ceil(remaining / 1000)}s`)
   }
 
