@@ -44,7 +44,6 @@ function slidingMoves(
           if (blocker.ownerId !== piece.ownerId) moves.push([r, c])
           break
         }
-        // ghost: pass through — can move to this square but not capture
         moves.push([r, c])
       } else {
         moves.push([r, c])
@@ -68,6 +67,14 @@ export function getValidMoves(
 
   if (pieceType === "rook") {
     return slidingMoves(piece, pieces, [[0,1],[0,-1],[1,0],[-1,0]])
+  }
+
+  if (pieceType === "bishop") {
+    return slidingMoves(piece, pieces, [[1,1],[1,-1],[-1,1],[-1,-1]])
+  }
+
+  if (pieceType === "queen") {
+    return slidingMoves(piece, pieces, [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]])
   }
 
   if (pieceType === "knight") {
@@ -121,7 +128,8 @@ export function applyMove(
   fromRow: number,
   fromCol: number,
   toRow: number,
-  toCol: number
+  toCol: number,
+  pawnDirs: Record<string, number> = {}
 ): { pieces: ChessPieceData[]; captured: ChessPieceData | null } {
   const mover = pieces.find(p => p.row === fromRow && p.col === fromCol)
   const target = pieces.find(p => p.row === toRow && p.col === toCol && !p.isGhost)
@@ -131,12 +139,55 @@ export function applyMove(
     .filter(p => !(p.row === toRow && p.col === toCol && !p.isGhost && mover && p.ownerId !== mover.ownerId))
     .map(p => {
       if (p.row === fromRow && p.col === fromCol) {
-        return { ...p, row: toRow, col: toCol }
+        let pieceType = p.pieceType
+        if (p.pieceType === "pawn" && pawnDirs[p.ownerId] !== undefined) {
+          const dir = pawnDirs[p.ownerId]
+          if ((dir === -1 && toRow === 0) || (dir === 1 && toRow === 7)) pieceType = "queen"
+        }
+        return { ...p, row: toRow, col: toCol, pieceType }
       }
       return p
     })
 
   return { pieces: updated, captured }
+}
+
+export function isInCheck(
+  pieces: ChessPieceData[],
+  playerId: string,
+  pawnDirs: Record<string, number>
+): boolean {
+  const king = pieces.find(p => p.ownerId === playerId && p.pieceType === "king" && !p.isGhost)
+  if (!king) return false
+  for (const opp of pieces) {
+    if (opp.ownerId === playerId || opp.isGhost) continue
+    const moves = getValidMoves(opp.id, pieces, pawnDirs)
+    if (moves.some(([r, c]) => r === king.row && c === king.col)) return true
+  }
+  return false
+}
+
+export function getLegalMoves(
+  pieceId: string,
+  pieces: ChessPieceData[],
+  pawnDirs: Record<string, number>
+): Array<[number, number]> {
+  const piece = pieces.find(p => p.id === pieceId)
+  if (!piece) return []
+  return getValidMoves(pieceId, pieces, pawnDirs).filter(([toRow, toCol]) => {
+    const { pieces: after } = applyMove(pieces, piece.row, piece.col, toRow, toCol)
+    return !isInCheck(after, piece.ownerId, pawnDirs)
+  })
+}
+
+export function hasLegalMoves(
+  pieces: ChessPieceData[],
+  playerId: string,
+  pawnDirs: Record<string, number>
+): boolean {
+  return pieces
+    .filter(p => p.ownerId === playerId && !p.isGhost)
+    .some(p => getLegalMoves(p.id, pieces, pawnDirs).length > 0)
 }
 
 export function isPlayerEliminated(pieces: ChessPieceData[], playerId: string): boolean {

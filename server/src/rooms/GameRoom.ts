@@ -5,6 +5,7 @@ import {
   MAX_ROUNDS,
   SCORE_CHEAT_CAUGHT,
   SCORE_CHEAT_SUCCESS,
+  SCORE_PLACEMENT,
   MINIGAMES,
   WHEEL_MIN_VELOCITY,
   WHEEL_MAX_VELOCITY,
@@ -13,7 +14,7 @@ import {
   CHESS_PAWN_DIRS,
   CHESS_TURN_MS,
 } from "../../../shared/constants"
-import { buildInitialBoard, getValidMoves, applyMove, ChessPieceData } from "../../../shared/chessLogic"
+import { buildInitialBoard, getLegalMoves, hasLegalMoves, isInCheck, applyMove, ChessPieceData } from "../../../shared/chessLogic"
 
 interface JoinOptions {
   name: string
@@ -54,6 +55,7 @@ export class GameRoom extends Room<GameState> {
   private chessPiecesData: ChessPieceData[] = []
   private chessPawnDirs: Record<string, number> = {}
   private chessTurnToken = 0
+  private chessEliminationOrder: string[] = []
 
   onCreate(_options: unknown) {
     this.setState(new GameState())
@@ -232,6 +234,7 @@ export class GameRoom extends Room<GameState> {
   private startChessRound() {
     const playerIds = [...this.state.players.keys()]
     this.chessPiecesData = buildInitialBoard(playerIds)
+    this.chessEliminationOrder = []
 
     this.chessPawnDirs = {}
     playerIds.forEach((id, idx) => {
@@ -287,8 +290,17 @@ export class GameRoom extends Room<GameState> {
     const active = this.getActiveChessPlayers()
     if (active.length === 0) return
     const idx = active.indexOf(currentPlayerId)
-    const next = active[(idx + 1) % active.length]
-    this.advanceChessTurn(next)
+    // Skip stalemate players (no legal moves, not in check)
+    for (let i = 1; i <= active.length; i++) {
+      const candidateId = active[(idx + i) % active.length]
+      if (hasLegalMoves(this.chessPiecesData, candidateId, this.chessPawnDirs)) {
+        this.advanceChessTurn(candidateId)
+        return
+      }
+    }
+    // All remaining players are stalemated — end the round with the winner being current player
+    const winner = active.find(id => id !== currentPlayerId) ?? active[0] ?? null
+    this.endChessRound(winner)
   }
 
   private handleChessMove(
@@ -303,18 +315,29 @@ export class GameRoom extends Room<GameState> {
     )
     if (!movingPiece) return
 
-    const validMoves = getValidMoves(movingPiece.id, this.chessPiecesData, this.chessPawnDirs)
-    const isValid = validMoves.some(([r, c]) => r === msg.toRow && c === msg.toCol)
-    if (!isValid) return
+    const legalMoves = getLegalMoves(movingPiece.id, this.chessPiecesData, this.chessPawnDirs)
+    if (!legalMoves.some(([r, c]) => r === msg.toRow && c === msg.toCol)) return
 
     const { pieces: updated, captured } = applyMove(
       this.chessPiecesData,
-      msg.fromRow, msg.fromCol, msg.toRow, msg.toCol
+      msg.fromRow, msg.fromCol, msg.toRow, msg.toCol,
+      this.chessPawnDirs
     )
     this.chessPiecesData = updated
 
+    // King directly captured (fallback path)
     if (captured && captured.pieceType === "king") {
       this.eliminatePlayer(captured.ownerId)
+    }
+
+    // Check each active player for checkmate
+    for (const pid of this.getActiveChessPlayers()) {
+      if (
+        isInCheck(this.chessPiecesData, pid, this.chessPawnDirs) &&
+        !hasLegalMoves(this.chessPiecesData, pid, this.chessPawnDirs)
+      ) {
+        this.eliminatePlayer(pid)
+      }
     }
 
     this.syncChessBoard()
@@ -325,10 +348,12 @@ export class GameRoom extends Room<GameState> {
   }
 
   private eliminatePlayer(playerId: string) {
+    if (this.isEliminated(playerId)) return
     this.chessPiecesData = this.chessPiecesData.map(p =>
       p.ownerId === playerId ? { ...p, isGhost: true } : p
     )
     this.state.chess.eliminatedIds.push(playerId)
+    this.chessEliminationOrder.push(playerId)
   }
 
   private checkChessWin(): boolean {
@@ -348,9 +373,16 @@ export class GameRoom extends Room<GameState> {
 
   private endChessRound(winnerId: string | null) {
     this.state.phase = "result"
-    if (winnerId) {
-      const winner = this.state.players.get(winnerId)
-      if (winner) winner.score += 3
+    // Build finish order: winner first, then eliminated in reverse order (last elim = 2nd)
+    const finishOrder: string[] = []
+    if (winnerId) finishOrder.push(winnerId)
+    for (let i = this.chessEliminationOrder.length - 1; i >= 0; i--) {
+      const pid = this.chessEliminationOrder[i]
+      if (pid !== winnerId) finishOrder.push(pid)
     }
+    finishOrder.forEach((pid, idx) => {
+      const player = this.state.players.get(pid)
+      if (player) player.score += SCORE_PLACEMENT[idx] ?? 0
+    })
   }
 }
