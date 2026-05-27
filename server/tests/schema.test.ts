@@ -6,7 +6,7 @@ describe("GameState", () => {
   it("initialises with lobby phase", () => {
     const state = new GameState()
     expect(state.phase).toBe("lobby")
-    expect(state.currentRound).toBe(0)
+    expect(state.olympiade.currentRound).toBe(0)
   })
 
   it("initialises with empty player map", () => {

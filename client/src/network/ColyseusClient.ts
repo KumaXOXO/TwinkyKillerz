@@ -42,3 +42,15 @@ export function sendWheelDone(): void {
 export function sendChessMove(fromRow: number, fromCol: number, toRow: number, toCol: number): void {
   _room?.send("chess_move", { fromRow, fromCol, toRow, toCol })
 }
+
+export function sendChat(text: string): void {
+  _room?.send("chat", { text })
+}
+
+export function sendGamemasterSettings(maxPlayers?: number, gameMode?: string): void {
+  _room?.send("gamemaster_settings", { maxPlayers, gameMode })
+}
+
+export function sendTransferGamemaster(targetId: string): void {
+  _room?.send("transfer_gamemaster", { targetId })
+}

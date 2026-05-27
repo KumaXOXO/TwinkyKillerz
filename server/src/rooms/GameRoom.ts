@@ -32,6 +32,15 @@ interface ChatMsg {
   text: string
 }
 
+interface GamemasterSettingsMsg {
+  maxPlayers?: number
+  gameMode?: string
+}
+
+interface TransferGamemasterMsg {
+  targetId: string
+}
+
 function generateRoomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("")
@@ -61,6 +70,12 @@ export class GameRoom extends Room<GameState> {
       this.handleChessMove(client, msg)
     )
     this.onMessage("chat", (client, msg: ChatMsg) => this.handleChat(client, msg))
+    this.onMessage("gamemaster_settings", (client, msg: GamemasterSettingsMsg) =>
+      this.handleGamemasterSettings(client, msg)
+    )
+    this.onMessage("transfer_gamemaster", (client, msg: TransferGamemasterMsg) =>
+      this.handleTransferGamemaster(client, msg)
+    )
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -110,6 +125,29 @@ export class GameRoom extends Room<GameState> {
     if (this.state.chatMessages.length > 50) {
       this.state.chatMessages.splice(0, 1)
     }
+  }
+
+  private handleGamemasterSettings(client: Client, msg: GamemasterSettingsMsg) {
+    const player = this.state.players.get(client.sessionId)
+    if (!player?.isGamemaster) return
+    if (this.state.phase !== "lobby") return
+    if (msg.maxPlayers !== undefined) {
+      const v = Math.max(2, Math.min(4, Math.floor(msg.maxPlayers)))
+      this.state.maxPlayers = v
+      this.maxClients = v
+    }
+    if (msg.gameMode !== undefined && ["olympiade", "single"].includes(msg.gameMode)) {
+      this.state.gameMode = msg.gameMode
+    }
+  }
+
+  private handleTransferGamemaster(client: Client, msg: TransferGamemasterMsg) {
+    const from = this.state.players.get(client.sessionId)
+    if (!from?.isGamemaster) return
+    const to = this.state.players.get(msg.targetId)
+    if (!to) return
+    from.isGamemaster = false
+    to.isGamemaster = true
   }
 
   private handleCheatAttempt(client: Client, msg: CheatAttemptMsg) {
