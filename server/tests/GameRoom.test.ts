@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { GameRoom } from "../src/rooms/GameRoom"
 import { GameState } from "../../shared/schema"
-import { CHEAT_WINDOW_MS, MAX_ROUNDS, WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY, CHESS_TURN_MS } from "../../shared/constants"
+import { CHEAT_WINDOW_MS, MAX_ROUNDS, WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY, CHESS_TURN_MS, PHASER_NUM_KEYS } from "../../shared/constants"
 
 function makeRoom() {
   const room = new GameRoom()
@@ -361,5 +361,13 @@ describe("GameRoom chess round", () => {
     room["checkChessWin"]()
     expect(room.state.phase).toBe("result")
     expect(room.state.players.get(winner)!.score).toBe(3)
+  })
+})
+
+describe("shared constants", () => {
+  it("PHASER_NUM_KEYS has correct Phaser 3 key names", () => {
+    expect(PHASER_NUM_KEYS[1]).toBe("ONE")
+    expect(PHASER_NUM_KEYS[2]).toBe("TWO")
+    expect(PHASER_NUM_KEYS[0]).toBe("ZERO")
   })
 })

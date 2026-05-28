@@ -82,3 +82,8 @@ export const CHARACTERS = [
   { id: "king",   name: "King",   color: "#ffcc44", symbol: "♔" },
 ] as const
 export type CharacterId = (typeof CHARACTERS)[number]["id"]
+
+export const PHASER_NUM_KEYS = [
+  "ZERO", "ONE", "TWO", "THREE", "FOUR",
+  "FIVE", "SIX", "SEVEN", "EIGHT", "NINE",
+] as const

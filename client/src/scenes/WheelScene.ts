@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
-import { MINIGAMES, WHEEL_ARROW_INFLUENCE, WHEEL_BASE_DECEL } from "@twinky/shared/constants"
+import { MINIGAMES, WHEEL_ARROW_INFLUENCE, WHEEL_BASE_DECEL, PHASER_NUM_KEYS } from "@twinky/shared/constants"
 import { computeSegmentWeights } from "@twinky/shared/wheelLogic"
 import { sendWheelDone, sendPlaceChip } from "../network/ColyseusClient"
 
@@ -110,7 +110,7 @@ export class WheelScene extends Phaser.Scene {
         this.timerText.setText("")
         this.chipsText.setText("")
         this.statusText.setText("")
-        this.time.delayedCall(500, () => {
+        this.time.delayedCall(250, () => {
           const sceneKey = state.olympiade.currentMinigame === "connect4" ? "Connect4Scene" : "ChessScene"
           this.scene.start(sceneKey, { room: this.room })
         })
@@ -204,30 +204,32 @@ export class WheelScene extends Phaser.Scene {
   }
 
   private buildPlacementUI() {
-    const myChips = this.room.state.players.get(this.room.sessionId)?.chips ?? 0
-    const { width, height } = this.scale
-
-    if (myChips > 0) {
-      this.statusText.setText("Place your chips on wheel segments!")
-      this.chipsText.setText(`You have ${myChips} chip${myChips !== 1 ? "s" : ""}`)
-    } else {
+    const me = this.room.state.players.get(this.room.sessionId)
+    if (!me || me.chips <= 0) {
       this.statusText.setText("Waiting for chip placement...")
       this.chipsText.setText("")
+      return
     }
+
+    const myChips = me.chips
+    const { width, height } = this.scale
+
+    this.statusText.setText("Place your chips on wheel segments!")
+    this.chipsText.setText(`You have ${myChips} chip${myChips !== 1 ? "s" : ""}`)
 
     const games = [...MINIGAMES] as string[]
     const startY = height / 2 + RADIUS + 138
     games.forEach((game, idx) => {
       const chips = this.room.state.olympiade.wheel.fields.get(game)?.fixedChips ?? 0
-      const prefix = myChips > 0 ? `[${idx + 1}] ` : ""
-      const line = `${prefix}${game.toUpperCase()}  (${chips} chip${chips !== 1 ? "s" : ""})`
+      const line = `[${idx + 1}] ${game.toUpperCase()}  (${chips} chip${chips !== 1 ? "s" : ""})`
       const t = this.add
         .text(width / 2, startY + idx * 22, line, { fontSize: "13px", color: C.text })
         .setOrigin(0.5)
       this.placementTexts.push(t)
 
-      if (myChips > 0) {
-        this.input.keyboard?.on(`keydown-${idx + 1}`, () => sendPlaceChip(idx))
+      const keyName = PHASER_NUM_KEYS[idx + 1]
+      if (keyName) {
+        this.input.keyboard?.on(`keydown-${keyName}`, () => sendPlaceChip(idx))
       }
     })
   }
@@ -238,7 +240,10 @@ export class WheelScene extends Phaser.Scene {
     // Remove digit key listeners
     const games = [...MINIGAMES] as string[]
     games.forEach((_g, idx) => {
-      this.input.keyboard?.removeAllListeners(`keydown-${idx + 1}`)
+      const keyName = PHASER_NUM_KEYS[idx + 1]
+      if (keyName) {
+        this.input.keyboard?.removeAllListeners(`keydown-${keyName}`)
+      }
     })
   }
 
