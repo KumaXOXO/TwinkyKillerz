@@ -32,6 +32,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private joinPhase: "character" | "roomChoice" | "codeInput" = "character"
   private typedCode = ""
   private choiceGroup: Phaser.GameObjects.GameObject[] = []
+  private codeDisplayText?: Phaser.GameObjects.Text
 
   constructor() {
     super({ key: "CharacterSelectScene" })
@@ -218,22 +219,22 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     const overlay = this.add.rectangle(width / 2, height / 2, 400, 160, 0x0d0d1a).setStrokeStyle(2, C.border).setDepth(10)
     const title = this.add.text(width / 2, height / 2 - 50, "Enter Room Code:", { fontSize: "16px", color: C.text }).setOrigin(0.5).setDepth(11)
-    this.add.rectangle(width / 2, height / 2, 240, 44, C.panel).setStrokeStyle(2, C.border).setDepth(11)
+    const inputBox = this.add.rectangle(width / 2, height / 2, 240, 44, C.panel).setStrokeStyle(2, C.border).setDepth(11)
     const codeDisplay = this.add.text(width / 2, height / 2, "", { fontSize: "22px", color: C.text, fontStyle: "bold" }).setOrigin(0.5).setDepth(12)
     const hint = this.add.text(width / 2, height / 2 + 50, "ENTER to join  |  ESC back", { fontSize: "12px", color: C.muted }).setOrigin(0.5).setDepth(11)
 
-    this.choiceGroup.push(overlay, title, codeDisplay, hint)
-    this.registry.set("codeDisplayRef", codeDisplay)
+    this.codeDisplayText = codeDisplay
+    this.choiceGroup.push(overlay, title, inputBox, codeDisplay, hint)
   }
 
   private clearChoiceGroup() {
     this.choiceGroup.forEach(o => (o as { destroy(): void }).destroy())
     this.choiceGroup = []
+    this.codeDisplayText = undefined
   }
 
   private updateCodeDisplay() {
-    const ref = this.registry.get("codeDisplayRef") as Phaser.GameObjects.Text | undefined
-    ref?.setText(this.typedCode)
+    this.codeDisplayText?.setText(this.typedCode)
   }
 
   private startCreate() {

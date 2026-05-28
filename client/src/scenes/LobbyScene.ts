@@ -183,7 +183,7 @@ export class LobbyScene extends Phaser.Scene {
     if (me?.isGamemaster && allReady) {
       this.actionText?.setText("SPACE — START GAME").setStyle({ color: C.ready })
     } else if (me?.isReady) {
-      this.actionText?.setText("SPACE — NOT READY").setStyle({ color: C.muted })
+      this.actionText?.setText("READY — WAITING FOR OTHERS").setStyle({ color: C.muted })
     } else {
       this.actionText?.setText("SPACE — READY").setStyle({ color: "#aa77ff" })
     }
