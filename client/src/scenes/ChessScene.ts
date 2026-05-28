@@ -110,9 +110,11 @@ export class ChessScene extends Phaser.Scene {
 
   private buildPawnDirs() {
     const order = [...this.room.state.chess.playerOrder] as string[]
-    const cornerDirs: number[] = [-1, -1, 1, 1]
+    // 2P: white (idx 0) bottom = -1, black (idx 1) top = +1
+    // 3-4P: corner order bottom-left, bottom-right, top-right, top-left
+    const dirs = order.length <= 2 ? [-1, 1] : [-1, -1, 1, 1]
     order.forEach((id, idx) => {
-      this.pawnDirs[id] = cornerDirs[idx % 4] ?? -1
+      this.pawnDirs[id] = dirs[idx % dirs.length] ?? -1
     })
   }
 
