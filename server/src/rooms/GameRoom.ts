@@ -70,6 +70,7 @@ export class GameRoom extends Room<GameState> {
   onCreate(_options: unknown) {
     this.setState(new GameState())
     this.state.roomCode = generateRoomCode()
+    this.setMetadata({ roomCode: this.state.roomCode })
     this.onMessage("player_ready", (client, msg) => this.handlePlayerReady(client, msg))
     this.onMessage("cheat_attempt", (client, msg: CheatAttemptMsg) =>
       this.handleCheatAttempt(client, msg)

@@ -29,6 +29,9 @@ export class CharacterSelectScene extends Phaser.Scene {
   private hintText!: Phaser.GameObjects.Text
   private cards: Phaser.GameObjects.Rectangle[] = []
   private cardBorders: Phaser.GameObjects.Rectangle[] = []
+  private joinPhase: "character" | "roomChoice" | "codeInput" = "character"
+  private typedCode = ""
+  private choiceGroup: Phaser.GameObjects.GameObject[] = []
 
   constructor() {
     super({ key: "CharacterSelectScene" })
@@ -110,6 +113,27 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   private handleKey(event: KeyboardEvent) {
+    if (this.joinPhase === "codeInput") {
+      if (event.key === "Escape") {
+        this.clearChoiceGroup()
+        this.joinPhase = "character"
+      } else if (event.key === "Backspace") {
+        this.typedCode = this.typedCode.slice(0, -1)
+        this.updateCodeDisplay()
+      } else if (event.key === "Enter" && this.typedCode.trim().length >= 4) {
+        sounds.menuConfirm()
+        this.startWithCode()
+      } else if (event.key.length === 1 && this.typedCode.length < 6) {
+        this.typedCode += event.key.toUpperCase()
+        this.updateCodeDisplay()
+      }
+      return
+    }
+    if (this.joinPhase === "roomChoice" && event.key === "Escape") {
+      this.clearChoiceGroup()
+      this.joinPhase = "character"
+      return
+    }
     if (event.key === "ArrowLeft") {
       this.selectedIdx = (this.selectedIdx - 1 + CHARACTERS.length) % CHARACTERS.length
       sounds.menuNav()
@@ -127,11 +151,11 @@ export class CharacterSelectScene extends Phaser.Scene {
       sounds.menuNav()
       this.refreshSelection()
     } else if (event.key === "Enter") {
+      if (this.joinPhase !== "character") return
       const name = this.typedName.trim()
       if (!name) return
       sounds.menuConfirm()
-      const ch = CHARACTERS[this.selectedIdx]
-      this.scene.start("LobbyScene", { name, characterId: ch?.id ?? "knight" })
+      this.showRoomChoice()
     } else if (event.key === "Backspace") {
       this.typedName = this.typedName.slice(0, -1)
       this.refreshNameCursor()
@@ -160,5 +184,74 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   private refreshNameCursor() {
     this.nameText?.setText(this.typedName + (this.cursorVisible ? "|" : " "))
+  }
+
+  private showRoomChoice() {
+    this.joinPhase = "roomChoice"
+    const { width, height } = this.scale
+
+    const overlay = this.add.rectangle(width / 2, height / 2, 460, 180, 0x0d0d1a).setStrokeStyle(2, C.border).setDepth(10)
+    const title = this.add.text(width / 2, height / 2 - 60, "How do you want to play?", { fontSize: "16px", color: C.text }).setOrigin(0.5).setDepth(11)
+
+    const createBtn = this.add.rectangle(width / 2 - 100, height / 2, 160, 48, C.border).setDepth(10).setInteractive({ useHandCursor: true })
+    const createLabel = this.add.text(width / 2 - 100, height / 2, "CREATE ROOM", { fontSize: "14px", color: C.text }).setOrigin(0.5).setDepth(11)
+    createBtn.on("pointerover", () => createBtn.setFillStyle(C.selected))
+    createBtn.on("pointerout", () => createBtn.setFillStyle(C.border))
+    createBtn.on("pointerdown", () => { sounds.menuConfirm(); this.startCreate() })
+
+    const joinBtn = this.add.rectangle(width / 2 + 100, height / 2, 160, 48, C.border).setDepth(10).setInteractive({ useHandCursor: true })
+    const joinLabel = this.add.text(width / 2 + 100, height / 2, "JOIN WITH CODE", { fontSize: "14px", color: C.text }).setOrigin(0.5).setDepth(11)
+    joinBtn.on("pointerover", () => joinBtn.setFillStyle(C.selected))
+    joinBtn.on("pointerout", () => joinBtn.setFillStyle(C.border))
+    joinBtn.on("pointerdown", () => { sounds.menuNav(); this.showCodeInput() })
+
+    const hint = this.add.text(width / 2, height / 2 + 60, "ESC — back", { fontSize: "12px", color: C.muted }).setOrigin(0.5).setDepth(11)
+
+    this.choiceGroup.push(overlay, title, createBtn, createLabel, joinBtn, joinLabel, hint)
+  }
+
+  private showCodeInput() {
+    this.joinPhase = "codeInput"
+    this.typedCode = ""
+    this.clearChoiceGroup()
+    const { width, height } = this.scale
+
+    const overlay = this.add.rectangle(width / 2, height / 2, 400, 160, 0x0d0d1a).setStrokeStyle(2, C.border).setDepth(10)
+    const title = this.add.text(width / 2, height / 2 - 50, "Enter Room Code:", { fontSize: "16px", color: C.text }).setOrigin(0.5).setDepth(11)
+    this.add.rectangle(width / 2, height / 2, 240, 44, C.panel).setStrokeStyle(2, C.border).setDepth(11)
+    const codeDisplay = this.add.text(width / 2, height / 2, "", { fontSize: "22px", color: C.text, fontStyle: "bold" }).setOrigin(0.5).setDepth(12)
+    const hint = this.add.text(width / 2, height / 2 + 50, "ENTER to join  |  ESC back", { fontSize: "12px", color: C.muted }).setOrigin(0.5).setDepth(11)
+
+    this.choiceGroup.push(overlay, title, codeDisplay, hint)
+    this.registry.set("codeDisplayRef", codeDisplay)
+  }
+
+  private clearChoiceGroup() {
+    this.choiceGroup.forEach(o => (o as { destroy(): void }).destroy())
+    this.choiceGroup = []
+  }
+
+  private updateCodeDisplay() {
+    const ref = this.registry.get("codeDisplayRef") as Phaser.GameObjects.Text | undefined
+    ref?.setText(this.typedCode)
+  }
+
+  private startCreate() {
+    const ch = CHARACTERS[this.selectedIdx]
+    this.scene.start("LobbyScene", {
+      name: this.typedName.trim(),
+      characterId: ch?.id ?? "knight",
+      joinMode: "create",
+    })
+  }
+
+  private startWithCode() {
+    const ch = CHARACTERS[this.selectedIdx]
+    this.scene.start("LobbyScene", {
+      name: this.typedName.trim(),
+      characterId: ch?.id ?? "knight",
+      joinMode: "join",
+      roomCode: this.typedCode.trim().toUpperCase(),
+    })
   }
 }

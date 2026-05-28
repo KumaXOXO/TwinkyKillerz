@@ -19,6 +19,26 @@ export async function joinGame(
   return _room
 }
 
+export async function createRoom(
+  name: string,
+  characterId: string,
+): Promise<Room<GameState>> {
+  _room = await getClient().create<GameState>("game_room", { name, characterId })
+  return _room
+}
+
+export async function joinByCode(
+  name: string,
+  characterId: string,
+  roomCode: string,
+): Promise<Room<GameState>> {
+  const rooms = await getClient().getAvailableRooms<{ roomCode: string }>("game_room")
+  const target = rooms.find(r => r.metadata?.roomCode === roomCode.toUpperCase().trim())
+  if (!target) throw new Error("Room not found")
+  _room = await getClient().joinById<GameState>(target.roomId, { name, characterId })
+  return _room
+}
+
 export function getRoom(): Room<GameState> | null {
   return _room
 }

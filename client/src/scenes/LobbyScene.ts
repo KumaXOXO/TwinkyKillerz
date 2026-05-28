@@ -1,5 +1,5 @@
 import Phaser from "phaser"
-import { joinGame, sendPlayerReady, sendChat, sendGamemasterSettings } from "../network/ColyseusClient"
+import { joinGame, createRoom, joinByCode, sendPlayerReady, sendChat, sendGamemasterSettings, sendTransferGamemaster } from "../network/ColyseusClient"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 import { CHARACTERS } from "@twinky/shared/constants"
@@ -19,6 +19,8 @@ export class LobbyScene extends Phaser.Scene {
   private inputMode: "none" | "chat" = "none"
   private typedName = ""
   private characterId = "default"
+  private joinMode: "create" | "join" | "joinOrCreate" = "joinOrCreate"
+  private roomCode = ""
   private typedChat = ""
   private cursorVisible = true
   private cursorTimer = 0
@@ -37,9 +39,11 @@ export class LobbyScene extends Phaser.Scene {
     super({ key: "LobbyScene" })
   }
 
-  init(data?: { name?: string; characterId?: string }) {
+  init(data?: { name?: string; characterId?: string; joinMode?: "create" | "join"; roomCode?: string }) {
     this.typedName = data?.name ?? ""
     this.characterId = data?.characterId ?? "default"
+    this.joinMode = data?.joinMode ?? "joinOrCreate"
+    this.roomCode = data?.roomCode ?? ""
   }
 
   create() {
@@ -236,14 +240,21 @@ export class LobbyScene extends Phaser.Scene {
   private async doJoin(name: string) {
     this.nameHintText?.setText("Connecting...")
     try {
-      this.room = await joinGame(name, this.characterId)
+      if (this.joinMode === "create") {
+        this.room = await createRoom(name, this.characterId)
+      } else if (this.joinMode === "join") {
+        this.room = await joinByCode(name, this.characterId, this.roomCode)
+      } else {
+        this.room = await joinGame(name, this.characterId)
+      }
       this.uiPhase = "lobby"
       this.children.removeAll(true)
       this.setupStateSync()
       this.buildLobbyScreen()
       this.time.delayedCall(150, () => this.refreshLobbyUI())
-    } catch {
-      this.nameHintText?.setText("Connection failed — is the server running?")
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Connection failed"
+      this.nameHintText?.setText(msg + " — is the server running?")
     }
   }
 
