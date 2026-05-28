@@ -210,6 +210,13 @@ export class GameRoom extends Room<GameState> {
         this.state.olympiade.wheel.fields.set(game, f)
       }
     }
+    // Skip placement phase if no player has chips yet (round 1)
+    const anyChips = [...this.state.players.values()].some(p => p.chips > 0)
+    if (!anyChips) {
+      this.state.phase = "wheel"
+      this.startNewRound()
+      return
+    }
     this.state.olympiade.wheel.placementPhase = true
     this.state.olympiade.wheel.placementDeadline = Date.now() + WHEEL_PLACEMENT_MS
     this.state.phase = "wheel"
