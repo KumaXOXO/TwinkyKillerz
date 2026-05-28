@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import { Room } from "colyseus.js"
 import type { GameState, ChessPiece } from "@twinky/shared/schema"
-import { CHESS_PIECE_SYMBOLS, CHESS_PLAYER_COLORS, CHESS_CORNERS, CHESS_PAWN_DIRS } from "@twinky/shared/constants"
+import { CHESS_PIECE_SYMBOLS, CHESS_PLAYER_COLORS, CHESS_CORNERS, CHESS_PAWN_DIRS, CHARACTERS } from "@twinky/shared/constants"
 import { getLegalMoves, isInCheck, ChessPieceData } from "@twinky/shared/chessLogic"
 import { sendChessMove } from "../network/ColyseusClient"
 import { sounds } from "../utils/SoundManager"
@@ -161,13 +161,24 @@ export class ChessScene extends Phaser.Scene {
     })
   }
 
+  private getPieceSymbol(piece: ChessPiece): string {
+    if (piece.pieceType === "king") {
+      const player = this.room.state.players.get(piece.ownerId)
+      if (player?.characterId) {
+        const ch = CHARACTERS.find(c => c.id === player.characterId)
+        if (ch) return ch.symbol
+      }
+    }
+    return CHESS_PIECE_SYMBOLS[piece.pieceType] ?? "?"
+  }
+
   private renderPieces() {
     const currentIds = new Set<string>()
     this.room.state.chess.pieces.forEach((piece: ChessPiece, id: string) => {
       currentIds.add(id)
       const x = BOARD_OFFSET_X + piece.col * CELL_SIZE + CELL_SIZE / 2
       const y = BOARD_OFFSET_Y + piece.row * CELL_SIZE + CELL_SIZE / 2
-      const symbol = CHESS_PIECE_SYMBOLS[piece.pieceType] ?? "?"
+      const symbol = this.getPieceSymbol(piece)
       const color = this.playerColors[piece.ownerId] ?? "#ffffff"
 
       let text = this.pieceTexts.get(id)
