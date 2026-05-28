@@ -146,6 +146,26 @@ export class Connect4Scene extends Phaser.Scene {
         this.cellGraphics.push(g)
       }
     }
+
+    // Invisible interactive column zones
+    for (let c = 0; c < CONNECT4_COLS; c++) {
+      const zoneX = GRID_X + c * CELL + CELL / 2
+      const zoneY = GRID_Y + (CONNECT4_ROWS * CELL) / 2
+      const zone = this.add
+        .rectangle(zoneX, zoneY, CELL, CONNECT4_ROWS * CELL, 0x000000, 0)
+        .setInteractive({ useHandCursor: true })
+      zone.on("pointerover", () => {
+        if (this.room.state.connect4.turnPlayerId === this.room.sessionId) {
+          this.colHints[c]?.setColor(C.text)
+        }
+      })
+      zone.on("pointerout", () => this.colHints[c]?.setColor(C.muted))
+      zone.on("pointerdown", () => {
+        if (this.room.state.connect4.turnPlayerId === this.room.sessionId) {
+          sendConnect4Drop(c)
+        }
+      })
+    }
   }
 
   private drawPieces() {
