@@ -30,6 +30,7 @@ export class WheelScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text
   private resultText!: Phaser.GameObjects.Text
   private inPlacementPhase = false
+  private chipSidebarTexts: Map<string, Phaser.GameObjects.Text> = new Map()
 
   constructor() {
     super({ key: "WheelScene" })
@@ -44,6 +45,7 @@ export class WheelScene extends Phaser.Scene {
     this.isDone = false
     this.inPlacementPhase = false
     this.placementTexts = []
+    this.chipSidebarTexts = new Map()
   }
 
   create() {
@@ -87,6 +89,8 @@ export class WheelScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard!.createCursorKeys()
 
+    this.buildChipSidebar()
+
     this.inPlacementPhase = this.room.state.olympiade.wheel.placementPhase
     if (this.inPlacementPhase) {
       this.buildPlacementUI()
@@ -95,6 +99,7 @@ export class WheelScene extends Phaser.Scene {
     }
 
     this.stateChangeCallback = (state) => {
+      this.refreshChipSidebar()
       if (state.phase === "minigame") {
         if (this.stateChangeCallback) {
           this.room.onStateChange.remove(this.stateChangeCallback)
@@ -169,6 +174,28 @@ export class WheelScene extends Phaser.Scene {
       this.input.keyboard?.removeListener("keydown-SPACE", this.spaceHandler)
       this.spaceHandler = null
     }
+  }
+
+  private buildChipSidebar() {
+    this.add.text(10, 90, "CHIPS", { fontSize: "11px", color: C.muted })
+    let y = 110
+    this.room.state.players.forEach((player, id) => {
+      const color = id === this.room.sessionId ? C.chip : C.muted
+      const t = this.add.text(10, y, "", { fontSize: "13px", color })
+      this.chipSidebarTexts.set(id, t)
+      y += 20
+    })
+    this.refreshChipSidebar()
+  }
+
+  private refreshChipSidebar() {
+    this.room.state.players.forEach((player, id) => {
+      const t = this.chipSidebarTexts.get(id)
+      if (!t) return
+      const chips = player.chips
+      const dots = chips > 0 ? "●".repeat(chips) : "—"
+      t.setText(`${player.name}: ${dots} (${chips})`)
+    })
   }
 
   private buildPlacementUI() {
