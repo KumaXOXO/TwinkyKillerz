@@ -177,6 +177,10 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private handleLobbyKey(event: KeyboardEvent) {
+    if (!this.room) {
+      if (event.key === "Enter") this.scene.start("CharacterSelectScene")
+      return
+    }
     if (this.inputMode === "chat") {
       this.handleChatKey(event)
       return
@@ -233,17 +237,12 @@ export class LobbyScene extends Phaser.Scene {
       this.setupStateSync()
       this.buildLobbyScreen()
       this.time.delayedCall(150, () => this.refreshLobbyUI())
-    } catch (err) {
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Connection failed"
-      // Show error on a basic text since lobby screen isn't built yet
-      this.add
-        .text(this.scale.width / 2, this.scale.height / 2, msg + " — is the server running?", {
-          fontSize: "16px",
-          color: "#ff4444",
-          wordWrap: { width: 600 },
-          align: "center",
-        })
-        .setOrigin(0.5)
+      const cx = this.scale.width / 2
+      const cy = this.scale.height / 2
+      this.add.text(cx, cy, msg, { fontSize: "16px", color: "#ff5555" }).setOrigin(0.5)
+      this.add.text(cx, cy + 36, "Press ENTER to go back", { fontSize: "13px", color: C.muted }).setOrigin(0.5)
     }
   }
 

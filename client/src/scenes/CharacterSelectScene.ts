@@ -214,10 +214,11 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   private refreshButtons() {
-    const alpha = this.typedName.trim().length > 0 ? 1 : 0.4
-    this.createBtn?.setAlpha(alpha)
+    const hasName = this.typedName.trim().length > 0
+    const alpha = hasName ? 1 : 0.4
+    this.createBtn?.setAlpha(alpha).setFillStyle(C.border)
     this.createBtnLabel?.setAlpha(alpha)
-    this.joinBtn?.setAlpha(alpha)
+    this.joinBtn?.setAlpha(alpha).setFillStyle(C.border)
     this.joinBtnLabel?.setAlpha(alpha)
   }
 
