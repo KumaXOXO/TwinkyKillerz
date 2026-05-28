@@ -24,22 +24,22 @@ export type GamePhase = "lobby" | "wheel" | "minigame" | "result" | "gameover"
 export const CHESS_CORNERS = ["bottom-left", "bottom-right", "top-right", "top-left"] as const
 export type ChessCorner = (typeof CHESS_CORNERS)[number]
 
-// 3-4 player chess: 8 pieces per corner, each player occupies 4 columns
+// 3-4 player chess: 8 pieces per corner — kings at the outer corners
 export const CHESS_STARTING_POSITIONS: Record<ChessCorner, Array<[number, number, string]>> = {
   "bottom-left": [
-    [7,0,"rook"],[7,1,"knight"],[7,2,"bishop"],[7,3,"king"],
+    [7,0,"king"],[7,1,"knight"],[7,2,"bishop"],[7,3,"rook"],
     [6,0,"pawn"],[6,1,"pawn"],[6,2,"pawn"],[6,3,"pawn"],
   ],
   "bottom-right": [
-    [7,7,"rook"],[7,6,"knight"],[7,5,"bishop"],[7,4,"king"],
+    [7,7,"king"],[7,6,"knight"],[7,5,"bishop"],[7,4,"rook"],
     [6,7,"pawn"],[6,6,"pawn"],[6,5,"pawn"],[6,4,"pawn"],
   ],
   "top-right": [
-    [0,7,"rook"],[0,6,"knight"],[0,5,"bishop"],[0,4,"king"],
+    [0,7,"king"],[0,6,"knight"],[0,5,"bishop"],[0,4,"rook"],
     [1,7,"pawn"],[1,6,"pawn"],[1,5,"pawn"],[1,4,"pawn"],
   ],
   "top-left": [
-    [0,0,"rook"],[0,1,"knight"],[0,2,"bishop"],[0,3,"king"],
+    [0,0,"king"],[0,1,"knight"],[0,2,"bishop"],[0,3,"rook"],
     [1,0,"pawn"],[1,1,"pawn"],[1,2,"pawn"],[1,3,"pawn"],
   ],
 }

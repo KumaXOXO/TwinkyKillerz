@@ -304,12 +304,11 @@ describe("GameRoom chess round", () => {
     room["startChessRound"]()
     const firstTurnId = room.state.chess.turnPlayerId
     const mover = clients.find(c => c.sessionId === firstTurnId)!
-    // In the 4P layout "p1"'s king (7,3) is adjacent to "p2"'s king (7,4).
-    // The only legal move is capturing "p2"'s king at (7,4).
-    const king = [...room.state.chess.pieces.values()].find(
-      p => p.ownerId === firstTurnId && p.pieceType === "king"
+    // Move a pawn one step forward (bottom players move up: row 6 → row 5).
+    const pawn = [...room.state.chess.pieces.values()].find(
+      p => p.ownerId === firstTurnId && p.pieceType === "pawn"
     )!
-    room["handleChessMove"](mover, { fromRow: king.row, fromCol: king.col, toRow: king.row, toCol: king.col + 1 })
+    room["handleChessMove"](mover, { fromRow: pawn.row, fromCol: pawn.col, toRow: pawn.row - 1, toCol: pawn.col })
     expect(room.state.chess.turnPlayerId).not.toBe(firstTurnId)
   })
 
@@ -319,15 +318,14 @@ describe("GameRoom chess round", () => {
     room["startChessRound"]()
     const firstTurnId = room.state.chess.turnPlayerId
     const mover = clients.find(c => c.sessionId === firstTurnId)!
-    // In the 4P layout "p1"'s king (7,3) is adjacent to "p2"'s king (7,4).
-    // The only legal move is capturing "p2"'s king at (7,4).
-    const king = [...room.state.chess.pieces.values()].find(
-      p => p.ownerId === firstTurnId && p.pieceType === "king"
+    // Move a pawn one step forward (bottom players move up: row 6 → row 5).
+    const pawn = [...room.state.chess.pieces.values()].find(
+      p => p.ownerId === firstTurnId && p.pieceType === "pawn"
     )!
-    const toRow = king.row
-    const toCol = king.col + 1
-    room["handleChessMove"](mover, { fromRow: king.row, fromCol: king.col, toRow, toCol })
-    expect(room.state.chess.pieces.get(king.id)!.col).toBe(toCol)
+    const toRow = pawn.row - 1
+    const toCol = pawn.col
+    room["handleChessMove"](mover, { fromRow: pawn.row, fromCol: pawn.col, toRow, toCol })
+    expect(room.state.chess.pieces.get(pawn.id)!.row).toBe(toRow)
   })
 
   it("king capture turns captured player's pieces to ghosts", () => {
