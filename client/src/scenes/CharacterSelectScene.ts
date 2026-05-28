@@ -9,6 +9,7 @@ const CARD_H = 90
 const GAP = 10
 const GRID_LEFT = (800 - COLS * CARD_W - (COLS - 1) * GAP) / 2
 const GRID_TOP = 240
+const VERSION = "v0.2.0"
 
 const C = {
   bg: 0x0d0d1a,
@@ -43,6 +44,10 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.add
       .text(width / 2, 88, "Choose your character", { fontSize: "16px", color: C.muted })
       .setOrigin(0.5)
+
+    this.add
+      .text(width - 8, height - 8, VERSION, { fontSize: "11px", color: C.muted })
+      .setOrigin(1, 1)
 
     // Name input box
     this.add
