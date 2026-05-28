@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import { Room } from "colyseus.js"
 import type { GameState, ChessPiece } from "@twinky/shared/schema"
-import { CHESS_PIECE_SYMBOLS, CHESS_PLAYER_COLORS } from "@twinky/shared/constants"
+import { CHESS_PIECE_SYMBOLS, CHESS_PLAYER_COLORS, CHESS_CORNERS, CHESS_PAWN_DIRS } from "@twinky/shared/constants"
 import { getLegalMoves, isInCheck, ChessPieceData } from "@twinky/shared/chessLogic"
 import { sendChessMove } from "../network/ColyseusClient"
 import { sounds } from "../utils/SoundManager"
@@ -110,12 +110,18 @@ export class ChessScene extends Phaser.Scene {
 
   private buildPawnDirs() {
     const order = [...this.room.state.chess.playerOrder] as string[]
-    // 2P: white (idx 0) bottom = -1, black (idx 1) top = +1
-    // 3-4P: corner order bottom-left, bottom-right, top-right, top-left
-    const dirs = order.length <= 2 ? [-1, 1] : [-1, -1, 1, 1]
-    order.forEach((id, idx) => {
-      this.pawnDirs[id] = dirs[idx % dirs.length] ?? -1
-    })
+    if (order.length <= 2) {
+      // 2P: white (idx 0) advances up (-1), black (idx 1) advances down (+1)
+      order.forEach((id, idx) => {
+        this.pawnDirs[id] = idx === 0 ? -1 : 1
+      })
+    } else {
+      // 3-4P: use corner order from shared constants
+      order.forEach((id, idx) => {
+        const corner = CHESS_CORNERS[idx % CHESS_CORNERS.length]!
+        this.pawnDirs[id] = CHESS_PAWN_DIRS[corner]
+      })
+    }
   }
 
   private buildPlayerColors() {
