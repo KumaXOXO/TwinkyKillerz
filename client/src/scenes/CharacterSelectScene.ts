@@ -1,6 +1,7 @@
 import Phaser from "phaser"
 import { CHARACTERS } from "@twinky/shared/constants"
 import { sounds } from "../utils/SoundManager"
+import { joinByCode, getRoom } from "../network/ColyseusClient"
 
 const COLS = 3
 const ROWS = 2
@@ -33,6 +34,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private typedCode = ""
   private choiceGroup: Phaser.GameObjects.GameObject[] = []
   private codeDisplayText?: Phaser.GameObjects.Text
+  private codeErrorText?: Phaser.GameObjects.Text
   private createBtn!: Phaser.GameObjects.Rectangle
   private createBtnLabel!: Phaser.GameObjects.Text
   private joinBtn!: Phaser.GameObjects.Rectangle
@@ -233,15 +235,21 @@ export class CharacterSelectScene extends Phaser.Scene {
     const inputBox = this.add.rectangle(width / 2, height / 2, 240, 44, C.panel).setStrokeStyle(2, C.border).setDepth(11)
     const codeDisplay = this.add.text(width / 2, height / 2, "", { fontSize: "22px", color: C.text, fontStyle: "bold" }).setOrigin(0.5).setDepth(12)
     const hint = this.add.text(width / 2, height / 2 + 50, "ENTER to join  |  ESC back", { fontSize: "12px", color: C.muted }).setOrigin(0.5).setDepth(11)
+    const errText = this.add
+      .text(width / 2, height / 2 + 76, "", { fontSize: "13px", color: "#ff5555" })
+      .setOrigin(0.5)
+      .setDepth(11)
+    this.codeErrorText = errText
 
     this.codeDisplayText = codeDisplay
-    this.choiceGroup.push(overlay, title, inputBox, codeDisplay, hint)
+    this.choiceGroup.push(overlay, title, inputBox, codeDisplay, hint, errText)
   }
 
   private clearChoiceGroup() {
     this.choiceGroup.forEach(o => (o as { destroy(): void }).destroy())
     this.choiceGroup = []
     this.codeDisplayText = undefined
+    this.codeErrorText = undefined
   }
 
   private updateCodeDisplay() {
@@ -257,13 +265,32 @@ export class CharacterSelectScene extends Phaser.Scene {
     })
   }
 
-  private startWithCode() {
+  private setCodeError(msg: string) {
+    this.codeErrorText?.setText(msg)
+  }
+
+  private async startWithCode() {
     const ch = CHARACTERS[this.selectedIdx]
-    this.scene.start("LobbyScene", {
-      name: this.typedName.trim(),
-      characterId: ch?.id ?? "knight",
-      joinMode: "join",
-      roomCode: this.typedCode.trim().toUpperCase(),
-    })
+    this.setCodeError("Connecting...")
+    try {
+      await joinByCode(
+        this.typedName.trim(),
+        ch?.id ?? "knight",
+        this.typedCode.trim().toUpperCase(),
+      )
+      const room = getRoom()
+      if (room) {
+        this.scene.start("LobbyScene", {
+          name: this.typedName.trim(),
+          characterId: ch?.id ?? "knight",
+          joinMode: "existing",
+          room,
+        })
+      }
+    } catch {
+      this.setCodeError("Room not found — check the code and retry")
+      this.typedCode = ""
+      this.updateCodeDisplay()
+    }
   }
 }

@@ -20,8 +20,9 @@ export class LobbyScene extends Phaser.Scene {
   private inputMode: "none" | "chat" = "none"
   private typedName = ""
   private characterId = "default"
-  private joinMode: "create" | "join" | "joinOrCreate" = "joinOrCreate"
+  private joinMode: "create" | "join" | "joinOrCreate" | "existing" = "joinOrCreate"
   private roomCode = ""
+  private preJoinedRoom: Room<GameState> | null = null
   private typedChat = ""
   private cursorVisible = true
   private cursorTimer = 0
@@ -39,11 +40,18 @@ export class LobbyScene extends Phaser.Scene {
     super({ key: "LobbyScene" })
   }
 
-  init(data?: { name?: string; characterId?: string; joinMode?: "create" | "join"; roomCode?: string }) {
+  init(data?: {
+    name?: string
+    characterId?: string
+    joinMode?: "create" | "join" | "existing" | "joinOrCreate"
+    roomCode?: string
+    room?: Room<GameState>
+  }) {
     this.typedName = data?.name ?? ""
     this.characterId = data?.characterId ?? "default"
     this.joinMode = data?.joinMode ?? "joinOrCreate"
     this.roomCode = data?.roomCode ?? ""
+    this.preJoinedRoom = data?.room ?? null
   }
 
   create() {
@@ -226,7 +234,9 @@ export class LobbyScene extends Phaser.Scene {
 
   private async doJoin(name: string) {
     try {
-      if (this.joinMode === "create") {
+      if (this.preJoinedRoom) {
+        this.room = this.preJoinedRoom
+      } else if (this.joinMode === "create") {
         this.room = await createRoom(name, this.characterId)
       } else if (this.joinMode === "join") {
         this.room = await joinByCode(name, this.characterId, this.roomCode)
