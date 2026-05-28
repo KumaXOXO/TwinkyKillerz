@@ -31,6 +31,7 @@ export class WheelScene extends Phaser.Scene {
   private resultText!: Phaser.GameObjects.Text
   private inPlacementPhase = false
   private chipSidebarTexts: Map<string, Phaser.GameObjects.Text> = new Map()
+  private _brakeHitZone: Phaser.GameObjects.Arc | null = null
 
   constructor() {
     super({ key: "WheelScene" })
@@ -176,6 +177,8 @@ export class WheelScene extends Phaser.Scene {
       this.input.keyboard?.removeListener("keydown-SPACE", this.spaceHandler)
       this.spaceHandler = null
     }
+    this._brakeHitZone?.destroy()
+    this._brakeHitZone = null
   }
 
   private buildChipSidebar() {
@@ -267,7 +270,7 @@ export class WheelScene extends Phaser.Scene {
     this.statusText?.setText(
       isSpinner ? "Press SPACE to spin!" : `Waiting for ${spinnerName} to spin...`,
     )
-    this.timerText?.setText(isSpinner ? "← → to influence speed" : "")
+    this.timerText?.setText(isSpinner ? "← → or CLICK WHEEL to brake" : "")
     this.chipsText?.setText("")
 
     if (isSpinner) {
@@ -276,9 +279,30 @@ export class WheelScene extends Phaser.Scene {
         if (v <= 0) return
         this.velocity = v
         this.isSpinning = true
-        this.timerText?.setText("← → to influence speed")
+        this.timerText?.setText("← → or CLICK WHEEL to brake")
       }
       this.input.keyboard!.once("keydown-SPACE", this.spaceHandler)
+      const { width, height } = this.scale
+      const hitZone = this.add
+        .circle(width / 2, height / 2, RADIUS, 0xffffff, 0)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(20)
+      hitZone.on("pointerdown", () => {
+        if (!this.isSpinning || this.isDone) return
+        this.decelMult = Math.min(
+          1 + WHEEL_ARROW_INFLUENCE * 4,
+          this.decelMult + WHEEL_ARROW_INFLUENCE * 2,
+        )
+        this.tweens.add({
+          targets: this.wheelContainer,
+          scaleX: 0.95,
+          scaleY: 0.95,
+          duration: 80,
+          yoyo: true,
+          ease: "Cubic.easeOut",
+        })
+      })
+      this._brakeHitZone = hitZone
     }
   }
 
@@ -335,6 +359,8 @@ export class WheelScene extends Phaser.Scene {
   }
 
   private onWheelStopped() {
+    this._brakeHitZone?.destroy()
+    this._brakeHitZone = null
     const segments = [...MINIGAMES] as string[]
     const desiredIdx = segments.indexOf(
       this.room.state.olympiade.currentMinigame as (typeof MINIGAMES)[number],
