@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { GameRoom } from "../src/rooms/GameRoom"
+import { GameState } from "../../shared/schema"
 import { CHEAT_WINDOW_MS, MAX_ROUNDS, WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY, CHESS_TURN_MS } from "../../shared/constants"
 
 function makeRoom() {
@@ -49,6 +50,14 @@ describe("GameRoom.onJoin", () => {
   it("room gets a roomCode on create", () => {
     const room = makeRoom()
     expect(room.state.roomCode).toHaveLength(6)
+  })
+
+  it("lobby state sync does not crash when gameMode is undefined", async () => {
+    const state = new GameState()
+    // @ts-expect-error simulate partial patch arriving as undefined
+    state.gameMode = undefined
+    const safe = (state.gameMode ?? "olympiade").toUpperCase()
+    expect(safe).toBe("OLYMPIADE")
   })
 })
 

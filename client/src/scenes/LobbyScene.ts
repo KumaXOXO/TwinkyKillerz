@@ -150,9 +150,9 @@ export class LobbyScene extends Phaser.Scene {
     this.chatLogText?.setText(chatLines.join("\n"))
 
     if (me?.isGamemaster) {
-      this.settingsText?.setText(`[←/→] players: ${state.maxPlayers}   [M] mode: ${state.gameMode.toUpperCase()}`)
+      this.settingsText?.setText(`[←/→] players: ${state.maxPlayers}   [M] mode: ${(state.gameMode ?? "olympiade").toUpperCase()}`)
     } else {
-      this.settingsText?.setText(`Mode: ${state.gameMode.toUpperCase()}   Players: ${state.maxPlayers}`)
+      this.settingsText?.setText(`Mode: ${(state.gameMode ?? "olympiade").toUpperCase()}   Players: ${state.maxPlayers}`)
     }
 
     const connected = [...state.players.values()].filter((p) => p.isConnected)
