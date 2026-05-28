@@ -214,7 +214,7 @@ export class GameRoom extends Room<GameState> {
     const anyChips = [...this.state.players.values()].some(p => p.chips > 0)
     if (!anyChips) {
       this.state.phase = "wheel"
-      this.clock.setTimeout(() => this.startNewRound(), 0)
+      this.clock.setTimeout(() => this.startNewRound(), 0) // defer so phase change broadcasts before round starts
       return
     }
     this.state.olympiade.wheel.placementPhase = true
