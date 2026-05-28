@@ -151,7 +151,7 @@ export class WheelScene extends Phaser.Scene {
     }
     if (this.cursors.right.isDown) {
       this.decelMult = Math.min(
-        1 + WHEEL_ARROW_INFLUENCE,
+        1 + WHEEL_ARROW_INFLUENCE * 4,
         this.decelMult + WHEEL_ARROW_INFLUENCE * (delta / 1000),
       )
     }
