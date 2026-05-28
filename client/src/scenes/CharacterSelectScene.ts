@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import { CHARACTERS } from "@twinky/shared/constants"
 import { sounds } from "../utils/SoundManager"
-import { joinByCode, getRoom } from "../network/ColyseusClient"
+import { joinByCode } from "../network/ColyseusClient"
 
 const COLS = 3
 const ROWS = 2
@@ -31,6 +31,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private cards: Phaser.GameObjects.Rectangle[] = []
   private cardBorders: Phaser.GameObjects.Rectangle[] = []
   private joinPhase: "character" | "codeInput" = "character"
+  private isConnecting = false
   private typedCode = ""
   private choiceGroup: Phaser.GameObjects.GameObject[] = []
   private codeDisplayText?: Phaser.GameObjects.Text
@@ -270,27 +271,28 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   private async startWithCode() {
+    if (this.isConnecting) return
+    this.isConnecting = true
     const ch = CHARACTERS[this.selectedIdx]
     this.setCodeError("Connecting...")
     try {
-      await joinByCode(
+      const room = await joinByCode(
         this.typedName.trim(),
         ch?.id ?? "knight",
         this.typedCode.trim().toUpperCase(),
       )
-      const room = getRoom()
-      if (room) {
-        this.scene.start("LobbyScene", {
-          name: this.typedName.trim(),
-          characterId: ch?.id ?? "knight",
-          joinMode: "existing",
-          room,
-        })
-      }
+      this.scene.start("LobbyScene", {
+        name: this.typedName.trim(),
+        characterId: ch?.id ?? "knight",
+        joinMode: "existing",
+        room,
+      })
+      // No need to reset isConnecting on success — scene transitions away
     } catch {
       this.setCodeError("Room not found — check the code and retry")
       this.typedCode = ""
       this.updateCodeDisplay()
+      this.isConnecting = false
     }
   }
 }
