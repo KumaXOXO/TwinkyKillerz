@@ -65,10 +65,19 @@ export class CharacterSelectScene extends Phaser.Scene {
       const cx = GRID_LEFT + col * (CARD_W + GAP) + CARD_W / 2
       const cy = GRID_TOP + row * (CARD_H + GAP) + CARD_H / 2
 
-      const border = this.add.rectangle(cx, cy, CARD_W, CARD_H, C.panel).setStrokeStyle(2, C.border)
+      const border = this.add
+        .rectangle(cx, cy, CARD_W, CARD_H, C.panel)
+        .setStrokeStyle(2, C.border)
+        .setInteractive({ useHandCursor: true })
       const card = this.add.rectangle(cx, cy, CARD_W - 4, CARD_H - 4, C.panel)
       this.cardBorders.push(border)
       this.cards.push(card)
+
+      border.on("pointerdown", () => {
+        this.selectedIdx = i
+        sounds.menuNav()
+        this.refreshSelection()
+      })
 
       this.add.text(cx, cy - 18, ch.symbol, { fontSize: "28px", color: ch.color }).setOrigin(0.5)
       this.add.text(cx, cy + 18, ch.name, { fontSize: "13px", color: ch.color }).setOrigin(0.5)
