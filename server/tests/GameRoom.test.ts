@@ -255,10 +255,10 @@ describe("GameRoom chess round", () => {
     return { room, clients }
   }
 
-  it("startChessRound places 24 pieces in chess.pieces", () => {
+  it("startChessRound places 32 pieces in chess.pieces", () => {
     const { room } = setup4Players()
     room["startChessRound"]()
-    expect(room.state.chess.pieces.size).toBe(24)
+    expect(room.state.chess.pieces.size).toBe(32)
   })
 
   it("startChessRound sets chess.turnPlayerId to first player", () => {
@@ -304,11 +304,12 @@ describe("GameRoom chess round", () => {
     room["startChessRound"]()
     const firstTurnId = room.state.chess.turnPlayerId
     const mover = clients.find(c => c.sessionId === firstTurnId)!
-    const pawn = [...room.state.chess.pieces.values()].find(
-      p => p.ownerId === firstTurnId && p.pieceType === "pawn"
+    // In the 4P layout "p1"'s king (7,3) is adjacent to "p2"'s king (7,4).
+    // The only legal move is capturing "p2"'s king at (7,4).
+    const king = [...room.state.chess.pieces.values()].find(
+      p => p.ownerId === firstTurnId && p.pieceType === "king"
     )!
-    const dir = room["chessPawnDirs"][firstTurnId] as number
-    room["handleChessMove"](mover, { fromRow: pawn.row, fromCol: pawn.col, toRow: pawn.row + dir, toCol: pawn.col })
+    room["handleChessMove"](mover, { fromRow: king.row, fromCol: king.col, toRow: king.row, toCol: king.col + 1 })
     expect(room.state.chess.turnPlayerId).not.toBe(firstTurnId)
   })
 
@@ -318,13 +319,15 @@ describe("GameRoom chess round", () => {
     room["startChessRound"]()
     const firstTurnId = room.state.chess.turnPlayerId
     const mover = clients.find(c => c.sessionId === firstTurnId)!
-    const pawn = [...room.state.chess.pieces.values()].find(
-      p => p.ownerId === firstTurnId && p.pieceType === "pawn"
+    // In the 4P layout "p1"'s king (7,3) is adjacent to "p2"'s king (7,4).
+    // The only legal move is capturing "p2"'s king at (7,4).
+    const king = [...room.state.chess.pieces.values()].find(
+      p => p.ownerId === firstTurnId && p.pieceType === "king"
     )!
-    const dir = room["chessPawnDirs"][firstTurnId] as number
-    const toRow = pawn.row + dir
-    room["handleChessMove"](mover, { fromRow: pawn.row, fromCol: pawn.col, toRow, toCol: pawn.col })
-    expect(room.state.chess.pieces.get(pawn.id)!.row).toBe(toRow)
+    const toRow = king.row
+    const toCol = king.col + 1
+    room["handleChessMove"](mover, { fromRow: king.row, fromCol: king.col, toRow, toCol })
+    expect(room.state.chess.pieces.get(king.id)!.col).toBe(toCol)
   })
 
   it("king capture turns captured player's pieces to ghosts", () => {

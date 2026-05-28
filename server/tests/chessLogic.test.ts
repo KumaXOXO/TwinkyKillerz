@@ -157,14 +157,33 @@ describe("queen moves", () => {
 })
 
 describe("buildInitialBoard", () => {
-  it("creates 6 pieces per player", () => {
-    const board = buildInitialBoard(["alice", "bob"])
-    expect(board.filter(p => p.ownerId === "alice")).toHaveLength(6)
-    expect(board.filter(p => p.ownerId === "bob")).toHaveLength(6)
+  it("creates 16 pieces per player in 2P mode", () => {
+    const { pieces } = buildInitialBoard(["alice", "bob"])
+    expect(pieces.filter(p => p.ownerId === "alice")).toHaveLength(16)
+    expect(pieces.filter(p => p.ownerId === "bob")).toHaveLength(16)
   })
 
   it("each player has exactly one king", () => {
-    const board = buildInitialBoard(["alice", "bob"])
-    expect(board.filter(p => p.ownerId === "alice" && p.pieceType === "king")).toHaveLength(1)
+    const { pieces } = buildInitialBoard(["alice", "bob"])
+    expect(pieces.filter(p => p.ownerId === "alice" && p.pieceType === "king")).toHaveLength(1)
+  })
+
+  it("returns correct pawnDirs for 2P: white goes up (-1), black goes down (+1)", () => {
+    const { pawnDirs } = buildInitialBoard(["alice", "bob"])
+    expect(pawnDirs["alice"]).toBe(-1)
+    expect(pawnDirs["bob"]).toBe(1)
+  })
+
+  it("creates 8 pieces per player in 3P mode", () => {
+    const { pieces } = buildInitialBoard(["p1", "p2", "p3"])
+    expect(pieces.filter(p => p.ownerId === "p1")).toHaveLength(8)
+    expect(pieces.filter(p => p.ownerId === "p2")).toHaveLength(8)
+    expect(pieces.filter(p => p.ownerId === "p3")).toHaveLength(8)
+  })
+
+  it("creates 8 pieces per player in 4P mode", () => {
+    const { pieces } = buildInitialBoard(["p1", "p2", "p3", "p4"])
+    expect(pieces.filter(p => p.ownerId === "p1")).toHaveLength(8)
+    expect(pieces.filter(p => p.ownerId === "p4")).toHaveLength(8)
   })
 })

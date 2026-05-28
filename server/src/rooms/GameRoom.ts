@@ -13,8 +13,6 @@ import {
   WHEEL_PLACEMENT_MS,
   CHIPS_LAST_PLACE,
   CHIPS_SECOND_LAST,
-  CHESS_CORNERS,
-  CHESS_PAWN_DIRS,
   CHESS_TURN_MS,
   CONNECT4_TURN_MS,
   CONNECT4_COLS,
@@ -292,14 +290,10 @@ export class GameRoom extends Room<GameState> {
 
   private startChessRound() {
     const playerIds = [...this.state.players.keys()]
-    this.chessPiecesData = buildInitialBoard(playerIds)
+    const { pieces: initialPieces, pawnDirs } = buildInitialBoard(playerIds)
+    this.chessPiecesData = initialPieces
+    this.chessPawnDirs = pawnDirs
     this.chessEliminationOrder = []
-
-    this.chessPawnDirs = {}
-    playerIds.forEach((id, idx) => {
-      const corner = CHESS_CORNERS[idx % 4]
-      this.chessPawnDirs[id] = CHESS_PAWN_DIRS[corner]
-    })
 
     this.state.chess.playerOrder.clear()
     playerIds.forEach(id => this.state.chess.playerOrder.push(id))

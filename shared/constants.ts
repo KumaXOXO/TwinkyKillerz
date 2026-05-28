@@ -24,12 +24,40 @@ export type GamePhase = "lobby" | "wheel" | "minigame" | "result" | "gameover"
 export const CHESS_CORNERS = ["bottom-left", "bottom-right", "top-right", "top-left"] as const
 export type ChessCorner = (typeof CHESS_CORNERS)[number]
 
-// [row, col, pieceType] for each player's corner
+// 3-4 player chess: 8 pieces per corner, each player occupies 4 columns
 export const CHESS_STARTING_POSITIONS: Record<ChessCorner, Array<[number, number, string]>> = {
-  "bottom-left":  [[7,0,"rook"],[7,1,"king"],[7,2,"knight"],[6,0,"pawn"],[6,1,"pawn"],[6,2,"pawn"]],
-  "bottom-right": [[7,7,"rook"],[7,6,"king"],[7,5,"knight"],[6,7,"pawn"],[6,6,"pawn"],[6,5,"pawn"]],
-  "top-right":    [[0,7,"rook"],[0,6,"king"],[0,5,"knight"],[1,7,"pawn"],[1,6,"pawn"],[1,5,"pawn"]],
-  "top-left":     [[0,0,"rook"],[0,1,"king"],[0,2,"knight"],[1,0,"pawn"],[1,1,"pawn"],[1,2,"pawn"]],
+  "bottom-left": [
+    [7,0,"rook"],[7,1,"knight"],[7,2,"bishop"],[7,3,"king"],
+    [6,0,"pawn"],[6,1,"pawn"],[6,2,"pawn"],[6,3,"pawn"],
+  ],
+  "bottom-right": [
+    [7,7,"rook"],[7,6,"knight"],[7,5,"bishop"],[7,4,"king"],
+    [6,7,"pawn"],[6,6,"pawn"],[6,5,"pawn"],[6,4,"pawn"],
+  ],
+  "top-right": [
+    [0,7,"rook"],[0,6,"knight"],[0,5,"bishop"],[0,4,"king"],
+    [1,7,"pawn"],[1,6,"pawn"],[1,5,"pawn"],[1,4,"pawn"],
+  ],
+  "top-left": [
+    [0,0,"rook"],[0,1,"knight"],[0,2,"bishop"],[0,3,"king"],
+    [1,0,"pawn"],[1,1,"pawn"],[1,2,"pawn"],[1,3,"pawn"],
+  ],
+}
+
+// Standard 2-player chess: full 16 pieces per side
+export const CHESS_2P_STARTING_POSITIONS: Record<"white" | "black", Array<[number, number, string]>> = {
+  white: [
+    [7,0,"rook"],[7,1,"knight"],[7,2,"bishop"],[7,3,"queen"],
+    [7,4,"king"],[7,5,"bishop"],[7,6,"knight"],[7,7,"rook"],
+    [6,0,"pawn"],[6,1,"pawn"],[6,2,"pawn"],[6,3,"pawn"],
+    [6,4,"pawn"],[6,5,"pawn"],[6,6,"pawn"],[6,7,"pawn"],
+  ],
+  black: [
+    [0,0,"rook"],[0,1,"knight"],[0,2,"bishop"],[0,3,"queen"],
+    [0,4,"king"],[0,5,"bishop"],[0,6,"knight"],[0,7,"rook"],
+    [1,0,"pawn"],[1,1,"pawn"],[1,2,"pawn"],[1,3,"pawn"],
+    [1,4,"pawn"],[1,5,"pawn"],[1,6,"pawn"],[1,7,"pawn"],
+  ],
 }
 
 // pawn advances toward center: bottom players go up (-1), top players go down (+1)

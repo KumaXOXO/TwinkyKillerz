@@ -1,4 +1,9 @@
-import { CHESS_CORNERS, CHESS_STARTING_POSITIONS } from "./constants"
+import {
+  CHESS_CORNERS,
+  CHESS_STARTING_POSITIONS,
+  CHESS_2P_STARTING_POSITIONS,
+  CHESS_PAWN_DIRS,
+} from "./constants"
 
 export interface ChessPieceData {
   id: string
@@ -9,15 +14,33 @@ export interface ChessPieceData {
   isGhost: boolean
 }
 
-export function buildInitialBoard(playerIds: string[]): ChessPieceData[] {
+export function buildInitialBoard(
+  playerIds: string[],
+): { pieces: ChessPieceData[]; pawnDirs: Record<string, number> } {
   const pieces: ChessPieceData[] = []
-  playerIds.forEach((playerId, playerIdx) => {
-    const corner = CHESS_CORNERS[playerIdx % 4]
-    CHESS_STARTING_POSITIONS[corner].forEach(([row, col, pieceType], pieceIdx) => {
-      pieces.push({ id: `${playerId}-${pieceIdx}`, pieceType, ownerId: playerId, row, col, isGhost: false })
+  const pawnDirs: Record<string, number> = {}
+  let pieceCounter = 0
+
+  if (playerIds.length === 2) {
+    const sides: Array<"white" | "black"> = ["white", "black"]
+    sides.forEach((side, idx) => {
+      const playerId = playerIds[idx]!
+      pawnDirs[playerId] = side === "white" ? -1 : 1
+      CHESS_2P_STARTING_POSITIONS[side].forEach(([row, col, pieceType]) => {
+        pieces.push({ id: `p${pieceCounter++}`, pieceType, ownerId: playerId, row, col, isGhost: false })
+      })
     })
-  })
-  return pieces
+  } else {
+    playerIds.forEach((playerId, idx) => {
+      const corner = CHESS_CORNERS[idx % CHESS_CORNERS.length]!
+      pawnDirs[playerId] = CHESS_PAWN_DIRS[corner]
+      CHESS_STARTING_POSITIONS[corner].forEach(([row, col, pieceType]) => {
+        pieces.push({ id: `p${pieceCounter++}`, pieceType, ownerId: playerId, row, col, isGhost: false })
+      })
+    })
+  }
+
+  return { pieces, pawnDirs }
 }
 
 function inBounds(row: number, col: number): boolean {
