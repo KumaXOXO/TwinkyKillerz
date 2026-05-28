@@ -16,7 +16,7 @@ const C = {
 
 export class LobbyScene extends Phaser.Scene {
   private room: Room<GameState> | null = null
-  private uiPhase: "nameInput" | "lobby" = "nameInput"
+  private uiPhase: "lobby" = "lobby"
   private inputMode: "none" | "chat" = "none"
   private typedName = ""
   private characterId = "default"
@@ -25,8 +25,6 @@ export class LobbyScene extends Phaser.Scene {
   private typedChat = ""
   private cursorVisible = true
   private cursorTimer = 0
-  private nameDisplayText!: Phaser.GameObjects.Text
-  private nameHintText!: Phaser.GameObjects.Text
   private roomCodeText!: Phaser.GameObjects.Text
   private chatLogText!: Phaser.GameObjects.Text
   private chatInputText!: Phaser.GameObjects.Text
@@ -49,11 +47,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   create() {
-    if (this.typedName) {
-      this.doJoin(this.typedName)
-    } else {
-      this.buildNameInputScreen()
-    }
+    this.doJoin(this.typedName)
     this.input.keyboard!.on("keydown", this.handleKeydown, this)
   }
 
@@ -62,8 +56,7 @@ export class LobbyScene extends Phaser.Scene {
     if (this.cursorTimer >= 500) {
       this.cursorTimer = 0
       this.cursorVisible = !this.cursorVisible
-      if (this.uiPhase === "nameInput") this.refreshNameCursor()
-      else this.refreshChatCursor()
+      this.refreshChatCursor()
     }
   }
 
@@ -72,29 +65,6 @@ export class LobbyScene extends Phaser.Scene {
     if (this.stateChangeCallback && this.room) {
       this.room.onStateChange.remove(this.stateChangeCallback)
     }
-  }
-
-  private buildNameInputScreen() {
-    const { width, height } = this.scale
-    this.add
-      .text(width / 2, height / 2 - 120, "TWINKY GAMES", { fontSize: "40px", color: C.text, fontStyle: "bold" })
-      .setOrigin(0.5)
-    this.add
-      .text(width / 2, height / 2 - 40, "Enter your name:", { fontSize: "18px", color: C.muted })
-      .setOrigin(0.5)
-    this.add.rectangle(width / 2, height / 2 + 10, 320, 44, C.panel).setStrokeStyle(2, C.border)
-    this.nameDisplayText = this.add
-      .text(width / 2, height / 2 + 10, "", { fontSize: "22px", color: C.text })
-      .setOrigin(0.5)
-    this.nameHintText = this.add
-      .text(width / 2, height / 2 + 60, "Press ENTER to join", { fontSize: "14px", color: C.muted })
-      .setOrigin(0.5)
-    this.refreshNameCursor()
-  }
-
-  private refreshNameCursor() {
-    if (this.uiPhase !== "nameInput") return
-    this.nameDisplayText?.setText(this.typedName + (this.cursorVisible ? "|" : " "))
   }
 
   private buildLobbyScreen() {
@@ -203,21 +173,7 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private handleKeydown(event: KeyboardEvent) {
-    if (this.uiPhase === "nameInput") this.handleNameKey(event)
-    else this.handleLobbyKey(event)
-  }
-
-  private handleNameKey(event: KeyboardEvent) {
-    if (event.key === "Enter") {
-      const name = this.typedName.trim()
-      if (name) this.doJoin(name)
-    } else if (event.key === "Backspace") {
-      this.typedName = this.typedName.slice(0, -1)
-      this.refreshNameCursor()
-    } else if (event.key.length === 1 && this.typedName.length < 20) {
-      this.typedName += event.key
-      this.refreshNameCursor()
-    }
+    this.handleLobbyKey(event)
   }
 
   private handleLobbyKey(event: KeyboardEvent) {
@@ -265,7 +221,6 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private async doJoin(name: string) {
-    this.nameHintText?.setText("Connecting...")
     try {
       if (this.joinMode === "create") {
         this.room = await createRoom(name, this.characterId)
@@ -274,14 +229,21 @@ export class LobbyScene extends Phaser.Scene {
       } else {
         this.room = await joinGame(name, this.characterId)
       }
-      this.uiPhase = "lobby"
       this.children.removeAll(true)
       this.setupStateSync()
       this.buildLobbyScreen()
       this.time.delayedCall(150, () => this.refreshLobbyUI())
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Connection failed"
-      this.nameHintText?.setText(msg + " — is the server running?")
+      // Show error on a basic text since lobby screen isn't built yet
+      this.add
+        .text(this.scale.width / 2, this.scale.height / 2, msg + " — is the server running?", {
+          fontSize: "16px",
+          color: "#ff4444",
+          wordWrap: { width: 600 },
+          align: "center",
+        })
+        .setOrigin(0.5)
     }
   }
 

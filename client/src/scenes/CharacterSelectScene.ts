@@ -29,10 +29,14 @@ export class CharacterSelectScene extends Phaser.Scene {
   private hintText!: Phaser.GameObjects.Text
   private cards: Phaser.GameObjects.Rectangle[] = []
   private cardBorders: Phaser.GameObjects.Rectangle[] = []
-  private joinPhase: "character" | "roomChoice" | "codeInput" = "character"
+  private joinPhase: "character" | "codeInput" = "character"
   private typedCode = ""
   private choiceGroup: Phaser.GameObjects.GameObject[] = []
   private codeDisplayText?: Phaser.GameObjects.Text
+  private createBtn!: Phaser.GameObjects.Rectangle
+  private createBtnLabel!: Phaser.GameObjects.Text
+  private joinBtn!: Phaser.GameObjects.Rectangle
+  private joinBtnLabel!: Phaser.GameObjects.Text
 
   constructor() {
     super({ key: "CharacterSelectScene" })
@@ -88,11 +92,44 @@ export class CharacterSelectScene extends Phaser.Scene {
     })
 
     this.hintText = this.add
-      .text(width / 2, height - 30, "Arrows: choose  |  ENTER: join", {
+      .text(width / 2, height - 30, "Arrows: choose character  |  ENTER: create room", {
         fontSize: "13px",
         color: C.muted,
       })
       .setOrigin(0.5)
+
+    const btnY = height - 62
+    this.createBtn = this.add
+      .rectangle(width / 2 - 110, btnY, 190, 44, C.border)
+      .setInteractive({ useHandCursor: true })
+    this.createBtnLabel = this.add
+      .text(width / 2 - 110, btnY, "CREATE ROOM", { fontSize: "14px", color: C.text })
+      .setOrigin(0.5)
+    this.joinBtn = this.add
+      .rectangle(width / 2 + 110, btnY, 190, 44, C.border)
+      .setInteractive({ useHandCursor: true })
+    this.joinBtnLabel = this.add
+      .text(width / 2 + 110, btnY, "JOIN WITH CODE", { fontSize: "14px", color: C.text })
+      .setOrigin(0.5)
+
+    this.createBtn.on("pointerover", () => {
+      if (this.typedName.trim()) this.createBtn.setFillStyle(C.selected)
+    })
+    this.createBtn.on("pointerout", () => this.createBtn.setFillStyle(C.border))
+    this.createBtn.on("pointerdown", () => {
+      if (!this.typedName.trim()) return
+      sounds.menuConfirm()
+      this.startCreate()
+    })
+    this.joinBtn.on("pointerover", () => {
+      if (this.typedName.trim()) this.joinBtn.setFillStyle(C.selected)
+    })
+    this.joinBtn.on("pointerout", () => this.joinBtn.setFillStyle(C.border))
+    this.joinBtn.on("pointerdown", () => {
+      if (!this.typedName.trim()) return
+      sounds.menuNav()
+      this.showCodeInput()
+    })
 
     this.refreshSelection()
     this.refreshNameCursor()
@@ -130,11 +167,6 @@ export class CharacterSelectScene extends Phaser.Scene {
       }
       return
     }
-    if (this.joinPhase === "roomChoice" && event.key === "Escape") {
-      this.clearChoiceGroup()
-      this.joinPhase = "character"
-      return
-    }
     if (event.key === "ArrowLeft") {
       this.selectedIdx = (this.selectedIdx - 1 + CHARACTERS.length) % CHARACTERS.length
       sounds.menuNav()
@@ -156,7 +188,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       const name = this.typedName.trim()
       if (!name) return
       sounds.menuConfirm()
-      this.showRoomChoice()
+      this.startCreate()
     } else if (event.key === "Backspace") {
       this.typedName = this.typedName.slice(0, -1)
       this.refreshNameCursor()
@@ -174,41 +206,19 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.cards.forEach((c, i) => {
       c.setFillStyle(i === this.selectedIdx ? C.selected : C.panel)
     })
-    const ch = CHARACTERS[this.selectedIdx]
-    const name = this.typedName.trim()
-    if (ch) {
-      this.hintText?.setText(
-        name ? `Playing as ${ch.name} — ENTER to join` : "Type your name, then ENTER to join",
-      )
-    }
   }
 
   private refreshNameCursor() {
     this.nameText?.setText(this.typedName + (this.cursorVisible ? "|" : " "))
+    this.refreshButtons()
   }
 
-  private showRoomChoice() {
-    this.joinPhase = "roomChoice"
-    const { width, height } = this.scale
-
-    const overlay = this.add.rectangle(width / 2, height / 2, 460, 180, 0x0d0d1a).setStrokeStyle(2, C.border).setDepth(10)
-    const title = this.add.text(width / 2, height / 2 - 60, "How do you want to play?", { fontSize: "16px", color: C.text }).setOrigin(0.5).setDepth(11)
-
-    const createBtn = this.add.rectangle(width / 2 - 100, height / 2, 160, 48, C.border).setDepth(10).setInteractive({ useHandCursor: true })
-    const createLabel = this.add.text(width / 2 - 100, height / 2, "CREATE ROOM", { fontSize: "14px", color: C.text }).setOrigin(0.5).setDepth(11)
-    createBtn.on("pointerover", () => createBtn.setFillStyle(C.selected))
-    createBtn.on("pointerout", () => createBtn.setFillStyle(C.border))
-    createBtn.on("pointerdown", () => { sounds.menuConfirm(); this.startCreate() })
-
-    const joinBtn = this.add.rectangle(width / 2 + 100, height / 2, 160, 48, C.border).setDepth(10).setInteractive({ useHandCursor: true })
-    const joinLabel = this.add.text(width / 2 + 100, height / 2, "JOIN WITH CODE", { fontSize: "14px", color: C.text }).setOrigin(0.5).setDepth(11)
-    joinBtn.on("pointerover", () => joinBtn.setFillStyle(C.selected))
-    joinBtn.on("pointerout", () => joinBtn.setFillStyle(C.border))
-    joinBtn.on("pointerdown", () => { sounds.menuNav(); this.showCodeInput() })
-
-    const hint = this.add.text(width / 2, height / 2 + 60, "ESC — back", { fontSize: "12px", color: C.muted }).setOrigin(0.5).setDepth(11)
-
-    this.choiceGroup.push(overlay, title, createBtn, createLabel, joinBtn, joinLabel, hint)
+  private refreshButtons() {
+    const alpha = this.typedName.trim().length > 0 ? 1 : 0.4
+    this.createBtn?.setAlpha(alpha)
+    this.createBtnLabel?.setAlpha(alpha)
+    this.joinBtn?.setAlpha(alpha)
+    this.joinBtnLabel?.setAlpha(alpha)
   }
 
   private showCodeInput() {
