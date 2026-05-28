@@ -3,6 +3,7 @@ import { joinGame, createRoom, joinByCode, sendPlayerReady, sendChat, sendGamema
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 import { CHARACTERS } from "@twinky/shared/constants"
+import { sounds } from "../utils/SoundManager"
 
 const C = {
   panel: 0x16162a,
@@ -27,12 +28,13 @@ export class LobbyScene extends Phaser.Scene {
   private nameDisplayText!: Phaser.GameObjects.Text
   private nameHintText!: Phaser.GameObjects.Text
   private roomCodeText!: Phaser.GameObjects.Text
-  private playerListText!: Phaser.GameObjects.Text
   private chatLogText!: Phaser.GameObjects.Text
   private chatInputText!: Phaser.GameObjects.Text
   private actionText!: Phaser.GameObjects.Text
   private settingsText!: Phaser.GameObjects.Text
   private hintText!: Phaser.GameObjects.Text
+  private actionBtn!: Phaser.GameObjects.Rectangle
+  private playerEntries: Phaser.GameObjects.Text[] = []
   private stateChangeCallback: ((state: GameState) => void) | null = null
 
   constructor() {
@@ -101,7 +103,6 @@ export class LobbyScene extends Phaser.Scene {
     this.roomCodeText = this.add.text(width - 20, 16, "", { fontSize: "20px", color: C.crown }).setOrigin(1, 0)
     this.add.rectangle(170, 290, 300, 430, C.panel).setStrokeStyle(1, C.border)
     this.add.text(170, 65, "PLAYERS", { fontSize: "12px", color: C.muted }).setOrigin(0.5)
-    this.playerListText = this.add.text(30, 82, "", { fontSize: "16px", color: C.text, lineSpacing: 10 })
     this.add.rectangle(570, 270, 340, 390, C.panel).setStrokeStyle(1, C.border)
     this.add.text(570, 65, "CHAT", { fontSize: "12px", color: C.muted }).setOrigin(0.5)
     this.chatLogText = this.add.text(405, 82, "", {
@@ -115,6 +116,12 @@ export class LobbyScene extends Phaser.Scene {
     this.settingsText = this.add
       .text(width / 2, 520, "", { fontSize: "13px", color: C.muted, align: "center" })
       .setOrigin(0.5)
+    this.actionBtn = this.add
+      .rectangle(width / 2, 554, 240, 40, C.border)
+      .setInteractive({ useHandCursor: true })
+    this.actionBtn.on("pointerover", () => this.actionBtn.setFillStyle(0x2a1a4e))
+    this.actionBtn.on("pointerout", () => this.actionBtn.setFillStyle(C.border))
+    this.actionBtn.on("pointerdown", () => sendPlayerReady())
     this.actionText = this.add
       .text(width / 2, 554, "", { fontSize: "18px", color: "#aa77ff", fontStyle: "bold" })
       .setOrigin(0.5)
@@ -129,15 +136,35 @@ export class LobbyScene extends Phaser.Scene {
 
     this.roomCodeText?.setText(`ROOM: ${state.roomCode}`)
 
-    const playerLines: string[] = []
-    state.players.forEach((p) => {
+    this.playerEntries.forEach(t => t.destroy())
+    this.playerEntries = []
+    let py = 82
+    state.players.forEach((p, id) => {
       const ch = CHARACTERS.find(c => c.id === p.characterId)
       const symbol = ch?.symbol ?? "?"
-      playerLines.push(
-        `${p.isGamemaster ? "★ " : "  "}${symbol} ${p.name}${p.isReady ? " [READY]" : ""}${p.isConnected ? "" : " (offline)"}`,
-      )
+      const prefix = p.isGamemaster ? "★ " : "  "
+      const suffix = p.isReady ? " [READY]" : p.isConnected ? "" : " (offline)"
+      const label = `${prefix}${symbol} ${p.name}${suffix}`
+      const isMe = id === this.room?.sessionId
+      const meIsGM = state.players.get(this.room?.sessionId ?? "")?.isGamemaster ?? false
+      const canTransfer = meIsGM && !p.isGamemaster
+
+      const t = this.add.text(30, py, label, {
+        fontSize: "16px",
+        color: isMe ? C.text : C.muted,
+      })
+      if (canTransfer) {
+        t.setInteractive({ useHandCursor: true })
+        t.on("pointerover", () => t.setColor(C.crown))
+        t.on("pointerout", () => t.setColor(isMe ? C.text : C.muted))
+        t.on("pointerdown", () => {
+          sounds.menuConfirm()
+          sendTransferGamemaster(id)
+        })
+      }
+      this.playerEntries.push(t)
+      py += 26
     })
-    this.playerListText?.setText(playerLines.join("\n"))
 
     const chatLines = [...state.chatMessages]
       .slice(-14)
