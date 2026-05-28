@@ -2,6 +2,7 @@ import Phaser from "phaser"
 import { joinGame, sendPlayerReady, sendChat, sendGamemasterSettings } from "../network/ColyseusClient"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
+import { CHARACTERS } from "@twinky/shared/constants"
 
 const C = {
   panel: 0x16162a,
@@ -126,8 +127,10 @@ export class LobbyScene extends Phaser.Scene {
 
     const playerLines: string[] = []
     state.players.forEach((p) => {
+      const ch = CHARACTERS.find(c => c.id === p.characterId)
+      const symbol = ch?.symbol ?? "?"
       playerLines.push(
-        `${p.isGamemaster ? "* " : "  "}${p.name}${p.isReady ? " [READY]" : ""}${p.isConnected ? "" : " (offline)"}`,
+        `${p.isGamemaster ? "★ " : "  "}${symbol} ${p.name}${p.isReady ? " [READY]" : ""}${p.isConnected ? "" : " (offline)"}`,
       )
     })
     this.playerListText?.setText(playerLines.join("\n"))
