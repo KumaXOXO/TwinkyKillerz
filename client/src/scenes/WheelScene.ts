@@ -166,6 +166,8 @@ export class WheelScene extends Phaser.Scene {
   }
 
   shutdown() {
+    this.chipSidebarTexts.forEach(t => t.destroy())
+    this.chipSidebarTexts.clear()
     if (this.stateChangeCallback) {
       this.room.onStateChange.remove(this.stateChangeCallback)
       this.stateChangeCallback = null
@@ -193,7 +195,7 @@ export class WheelScene extends Phaser.Scene {
       const t = this.chipSidebarTexts.get(id)
       if (!t) return
       const chips = player.chips
-      const dots = chips > 0 ? "●".repeat(chips) : "—"
+      const dots = chips > 0 ? "●".repeat(Math.min(chips, 10)) + (chips > 10 ? ` +${chips - 10}` : "") : "—"
       t.setText(`${player.name}: ${dots} (${chips})`)
     })
   }
