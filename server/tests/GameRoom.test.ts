@@ -3,19 +3,38 @@ import { GameRoom } from "../src/rooms/GameRoom"
 import { GameState } from "../../shared/schema"
 import { CHEAT_WINDOW_MS, MAX_ROUNDS, WHEEL_MIN_VELOCITY, WHEEL_MAX_VELOCITY, CHESS_TURN_MS, PHASER_NUM_KEYS } from "../../shared/constants"
 
-function makeRoom() {
+function makeRoom(options: { isPrivate?: boolean } = {}) {
   const room = new GameRoom()
   room.roomId = "test"
   // @ts-ignore
   room.clock = { setTimeout: (fn: () => void, _ms: number) => fn, start: () => {} } as any
   // @ts-ignore
   room.broadcast = vi.fn()
-  room.onCreate({})
+  // Stub listing so setMetadata can persist; metadata getter reads this.listing.metadata.
+  // @ts-ignore
+  room.listing = { metadata: null, save: async () => {}, markModified: () => {} }
+  // @ts-ignore - internal state must allow setMetadata save path
+  room._internalState = 0
+  room.onCreate(options)
   return room
 }
 
 function makeClient(id: string) {
   return { sessionId: id, send: vi.fn() } as any
+}
+
+async function makeRoomWithPlayers(
+  n: number,
+  options: { isPrivate?: boolean } = {}
+): Promise<{ room: GameRoom; clients: ReturnType<typeof makeClient>[] }> {
+  const room = makeRoom(options)
+  const clients: ReturnType<typeof makeClient>[] = []
+  for (let i = 0; i < n; i++) {
+    const client = makeClient(`s${i}`)
+    await room.onJoin(client, { name: `P${i}`, characterId: "default" })
+    clients.push(client)
+  }
+  return { room, clients }
 }
 
 describe("GameRoom.onJoin", () => {
@@ -432,6 +451,61 @@ describe("Single game mode", () => {
     // sending player_ready again should not change phase
     for (const c of clients) room["handlePlayerReady"](c, {})
     expect(room.state.phase).toBe("game_select")
+  })
+})
+
+describe("Room metadata", () => {
+  it("publishes roomCode, playerCount, maxPlayers, isPrivate after creation", async () => {
+    const room = makeRoom()
+    expect(room.metadata).toMatchObject({
+      roomCode: room.state.roomCode,
+      playerCount: 0,
+      maxPlayers: 4,
+      isPrivate: false,
+    })
+  })
+
+  it("updates playerCount when a player joins and leaves", async () => {
+    const { room, clients } = await makeRoomWithPlayers(2)
+    expect(room.metadata?.playerCount).toBe(2)
+    await room.onLeave(clients[0], true)
+    expect(room.metadata?.playerCount).toBe(1)
+  })
+
+  it("updates maxPlayers in metadata when GM changes setting", async () => {
+    const { room, clients } = await makeRoomWithPlayers(1)
+    const gm = clients[0]
+    await room["handleGamemasterSettings"](gm, { maxPlayers: 2 })
+    expect(room.metadata?.maxPlayers).toBe(2)
+  })
+
+  it("publishes isPrivate true when created with isPrivate option", async () => {
+    const room = makeRoom({ isPrivate: true })
+    expect(room.metadata?.isPrivate).toBe(true)
+  })
+})
+
+describe("Full-lobby guard", () => {
+  it("onAuth refuses join when room is full", async () => {
+    const { room } = await makeRoomWithPlayers(4)
+    let rejected = false
+    try {
+      ;(room as unknown as { onAuth: (c: unknown, o: unknown) => boolean }).onAuth(
+        {},
+        { name: "X", characterId: "y" }
+      )
+    } catch {
+      rejected = true
+    }
+    expect(rejected).toBe(true)
+  })
+
+  it("onAuth allows join when room is not full", async () => {
+    const { room } = await makeRoomWithPlayers(2)
+    const result = (
+      room as unknown as { onAuth: (c: unknown, o: unknown) => boolean }
+    ).onAuth({}, { name: "X", characterId: "y" })
+    expect(result).toBe(true)
   })
 })
 

@@ -65,10 +65,10 @@ export class GameRoom extends Room<GameState> {
   private connect4Board: Board = []
   private connect4TurnToken = 0
 
-  onCreate(_options: unknown) {
+  async onCreate(options: { isPrivate?: boolean } = {}) {
     this.setState(new GameState())
     this.state.roomCode = generateRoomCode()
-    this.setMetadata({ roomCode: this.state.roomCode })
+    this.state.isPrivate = options.isPrivate === true
     this.onMessage("player_ready", (client, msg) => this.handlePlayerReady(client, msg))
     this.onMessage("cheat_attempt", (client, msg: CheatAttemptMsg) =>
       this.handleCheatAttempt(client, msg)
@@ -94,6 +94,25 @@ export class GameRoom extends Room<GameState> {
       this.handleConnect4Drop(client, msg)
     )
     this.onMessage("select_game", (client, msg) => this.handleSelectGame(client, msg))
+    await this.updateRoomMetadata()
+  }
+
+  onAuth(_client: Client, _options: unknown): boolean {
+    const connectedCount = [...this.state.players.values()].filter((p) => p.isConnected).length
+    if (connectedCount >= this.state.maxPlayers) {
+      throw new Error("Room is full")
+    }
+    return true
+  }
+
+  private async updateRoomMetadata(): Promise<void> {
+    const connectedCount = [...this.state.players.values()].filter((p) => p.isConnected).length
+    await this.setMetadata({
+      roomCode: this.state.roomCode,
+      playerCount: connectedCount,
+      maxPlayers: this.state.maxPlayers,
+      isPrivate: this.state.isPrivate,
+    })
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -103,6 +122,7 @@ export class GameRoom extends Room<GameState> {
     player.characterId = options.characterId ?? "default"
     player.isGamemaster = this.state.players.size === 0
     this.state.players.set(client.sessionId, player)
+    this.updateRoomMetadata()
   }
 
   onLeave(client: Client, _consented: boolean) {
@@ -112,6 +132,7 @@ export class GameRoom extends Room<GameState> {
       player.isReady = false
     }
     this.readyPlayers.delete(client.sessionId)
+    this.updateRoomMetadata()
   }
 
   onDispose() {}
@@ -177,6 +198,7 @@ export class GameRoom extends Room<GameState> {
       const v = Math.max(2, Math.min(4, Math.floor(msg.maxPlayers)))
       this.state.maxPlayers = v
       this.maxClients = v
+      this.updateRoomMetadata()
     }
     if (msg.gameMode !== undefined && ["olympiade", "single"].includes(msg.gameMode)) {
       this.state.gameMode = msg.gameMode
