@@ -171,6 +171,8 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   shutdown() {
+    this.refreshTimer?.remove(false)
+    this.refreshTimer = undefined
     this.input.keyboard!.off("keydown", this.handleKey, this)
   }
 
@@ -321,6 +323,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     } catch {
       lobbies = []
     }
+    if (this.joinPhase !== "codeInput") return
     this.lobbyRows.forEach(o => (o as { destroy(): void }).destroy())
     this.lobbyRows = []
     const listX = width / 2 - 170
