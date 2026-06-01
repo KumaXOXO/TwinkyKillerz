@@ -96,6 +96,11 @@ export class ResultScene extends Phaser.Scene {
     this.input.keyboard?.once("keydown-SPACE", () => sendPlayerReady())
 
     const onStateChange = (state: GameState) => {
+      if (state.phase === "game_select") {
+        this.room.onStateChange.remove(onStateChange)
+        this.scene.start("GameSelectScene", { room: this.room })
+        return
+      }
       if (state.phase === "wheel") {
         this.room.onStateChange.remove(onStateChange)
         this.scene.start("WheelScene", { room: this.room })

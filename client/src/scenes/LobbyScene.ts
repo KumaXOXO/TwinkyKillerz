@@ -259,6 +259,12 @@ export class LobbyScene extends Phaser.Scene {
   private setupStateSync() {
     if (!this.room) return
     this.stateChangeCallback = (state: GameState) => {
+      if (state.phase === "game_select") {
+        this.room!.onStateChange.remove(this.stateChangeCallback!)
+        this.stateChangeCallback = null
+        this.scene.start("GameSelectScene", { room: this.room })
+        return
+      }
       if (state.phase === "wheel") {
         this.room!.onStateChange.remove(this.stateChangeCallback!)
         this.stateChangeCallback = null
