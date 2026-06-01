@@ -19,7 +19,7 @@ export const CONNECT4_COLS = 7
 export const CONNECT4_ROWS = 6
 export const CONNECT4_TURN_MS = 20_000
 
-export type GamePhase = "lobby" | "wheel" | "minigame" | "result" | "gameover"
+export type GamePhase = "lobby" | "wheel" | "game_select" | "minigame" | "result" | "gameover"
 
 export const CHESS_CORNERS = ["bottom-left", "bottom-right", "top-right", "top-left"] as const
 export type ChessCorner = (typeof CHESS_CORNERS)[number]

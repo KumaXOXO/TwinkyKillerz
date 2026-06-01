@@ -93,6 +93,7 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("connect4_drop", (client, msg: { col: number }) =>
       this.handleConnect4Drop(client, msg)
     )
+    this.onMessage("select_game", (client, msg) => this.handleSelectGame(client, msg))
   }
 
   onJoin(client: Client, options: JoinOptions) {
@@ -127,7 +128,29 @@ export class GameRoom extends Room<GameState> {
     if (allReady) {
       this.readyPlayers.clear()
       for (const p of this.state.players.values()) p.isReady = false
-      this.startPlacementPhase()
+      if (this.state.gameMode === "single") {
+        this.startSingleMode()
+      } else {
+        this.startPlacementPhase()
+      }
+    }
+  }
+
+  private startSingleMode(): void {
+    this.state.phase = "game_select"
+  }
+
+  private handleSelectGame(client: Client, msg: { game: string }): void {
+    const player = this.state.players.get(client.sessionId)
+    if (!player?.isGamemaster) return
+    if (!(MINIGAMES as readonly string[]).includes(msg.game)) return
+    this.state.selectedGame = msg.game
+    this.state.olympiade.currentMinigame = msg.game
+    this.state.phase = "minigame"
+    if (msg.game === "chess") {
+      this.startChessRound()
+    } else {
+      this.startConnect4Round()
     }
   }
 

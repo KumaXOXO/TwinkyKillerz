@@ -364,6 +364,59 @@ describe("GameRoom chess round", () => {
   })
 })
 
+describe("Single game mode", () => {
+  function makeSingleRoom(playerCount = 2) {
+    const room = makeRoom()
+    const clients = Array.from({ length: playerCount }, (_, i) => {
+      const c = makeClient(`p${i + 1}`)
+      room.onJoin(c, { name: `Player${i + 1}`, characterId: "a" })
+      return c
+    })
+    room.state.gameMode = "single"
+    return { room, clients }
+  }
+
+  it("transitions to game_select phase when all ready in single mode", async () => {
+    const { room, clients } = makeSingleRoom(2)
+    for (const c of clients) room["handlePlayerReady"](c, {})
+    expect(room.state.phase).toBe("game_select")
+  })
+
+  it("GM can select chess in single mode", async () => {
+    const { room, clients } = makeSingleRoom(2)
+    for (const c of clients) room["handlePlayerReady"](c, {})
+    const gm = clients.find(c => room.state.players.get(c.sessionId)?.isGamemaster)!
+    room["handleSelectGame"](gm, { game: "chess" })
+    expect(room.state.phase).toBe("minigame")
+    expect(room.state.olympiade.currentMinigame).toBe("chess")
+  })
+
+  it("non-GM cannot select game", async () => {
+    const { room, clients } = makeSingleRoom(2)
+    for (const c of clients) room["handlePlayerReady"](c, {})
+    const nonGm = clients.find(c => !room.state.players.get(c.sessionId)?.isGamemaster)!
+    room["handleSelectGame"](nonGm, { game: "chess" })
+    expect(room.state.phase).toBe("game_select")
+  })
+
+  it("invalid game name is rejected", async () => {
+    const { room, clients } = makeSingleRoom(2)
+    for (const c of clients) room["handlePlayerReady"](c, {})
+    const gm = clients.find(c => room.state.players.get(c.sessionId)?.isGamemaster)!
+    room["handleSelectGame"](gm, { game: "notaGame" })
+    expect(room.state.phase).toBe("game_select")
+  })
+
+  it("GM can select connect4 in single mode", async () => {
+    const { room, clients } = makeSingleRoom(2)
+    for (const c of clients) room["handlePlayerReady"](c, {})
+    const gm = clients.find(c => room.state.players.get(c.sessionId)?.isGamemaster)!
+    room["handleSelectGame"](gm, { game: "connect4" })
+    expect(room.state.phase).toBe("minigame")
+    expect(room.state.olympiade.currentMinigame).toBe("connect4")
+  })
+})
+
 describe("shared constants", () => {
   it("PHASER_NUM_KEYS has correct Phaser 3 key names", () => {
     expect(PHASER_NUM_KEYS[1]).toBe("ONE")

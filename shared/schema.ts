@@ -75,6 +75,7 @@ export class GameState extends Schema {
   @type("string") roomCode: string = ""
   @type("number") maxPlayers: number = 4
   @type("string") gameMode: string = "olympiade"
+  @type("string") selectedGame: string = ""
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>()
   @type([CheatEvent]) cheatLog = new ArraySchema<CheatEvent>()
   @type([ChatMessage]) chatMessages = new ArraySchema<ChatMessage>()
