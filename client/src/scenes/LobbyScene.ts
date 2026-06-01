@@ -22,6 +22,7 @@ export class LobbyScene extends Phaser.Scene {
   private characterId = "default"
   private joinMode: "create" | "join" | "joinOrCreate" | "existing" = "joinOrCreate"
   private roomCode = ""
+  private createIsPrivate = false
   private preJoinedRoom: Room<GameState> | null = null
   private typedChat = ""
   private cursorVisible = true
@@ -46,12 +47,14 @@ export class LobbyScene extends Phaser.Scene {
     joinMode?: "create" | "join" | "existing" | "joinOrCreate"
     roomCode?: string
     room?: Room<GameState>
+    isPrivate?: boolean
   }) {
     this.typedName = data?.name ?? ""
     this.characterId = data?.characterId ?? "default"
     this.joinMode = data?.joinMode ?? "joinOrCreate"
     this.roomCode = data?.roomCode ?? ""
     this.preJoinedRoom = data?.room ?? null
+    this.createIsPrivate = data?.isPrivate ?? false
   }
 
   create() {
@@ -68,6 +71,26 @@ export class LobbyScene extends Phaser.Scene {
     }
   }
 
+  private async copyRoomCode(): Promise<void> {
+    const code = this.room?.state.roomCode
+    if (!code) return
+    try {
+      await navigator.clipboard.writeText(code)
+    } catch {
+      return
+    }
+    sounds.menuConfirm()
+    const original = this.roomCodeText.text
+    this.roomCodeText.setText("COPIED!")
+    this.time.delayedCall(900, () => {
+      try {
+        this.roomCodeText?.setText(original)
+      } catch {
+        // scene destroyed during delay, ignore
+      }
+    })
+  }
+
   shutdown() {
     this.input.keyboard!.off("keydown", this.handleKeydown, this)
     if (this.stateChangeCallback && this.room) {
@@ -78,7 +101,27 @@ export class LobbyScene extends Phaser.Scene {
   private buildLobbyScreen() {
     const { width } = this.scale
     this.add.text(20, 16, "TWINKY GAMES", { fontSize: "20px", color: C.text, fontStyle: "bold" })
-    this.roomCodeText = this.add.text(width - 20, 16, "", { fontSize: "20px", color: C.crown }).setOrigin(1, 0)
+    this.roomCodeText = this.add
+      .text(width - 20, 16, "", { fontSize: "20px", color: C.crown })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true })
+    this.roomCodeText.on("pointerover", () => {
+      this.tweens.add({
+        targets: this.roomCodeText,
+        scale: 1.15,
+        duration: 120,
+        ease: "Sine.easeOut",
+      })
+    })
+    this.roomCodeText.on("pointerout", () => {
+      this.tweens.add({
+        targets: this.roomCodeText,
+        scale: 1.0,
+        duration: 120,
+        ease: "Sine.easeOut",
+      })
+    })
+    this.roomCodeText.on("pointerdown", () => this.copyRoomCode())
     this.add.rectangle(170, 290, 300, 430, C.panel).setStrokeStyle(1, C.border)
     this.add.text(170, 65, "PLAYERS", { fontSize: "12px", color: C.muted }).setOrigin(0.5)
     this.add.rectangle(570, 270, 340, 390, C.panel).setStrokeStyle(1, C.border)
@@ -149,10 +192,15 @@ export class LobbyScene extends Phaser.Scene {
       .map((m) => `${state.players.get(m!.playerId)?.name ?? "?"}: ${m!.text}`)
     this.chatLogText?.setText(chatLines.join("\n"))
 
+    const visibility = state.isPrivate ? "PRIVATE" : "PUBLIC"
     if (me?.isGamemaster) {
-      this.settingsText?.setText(`[←/→] players: ${state.maxPlayers}   [M] mode: ${(state.gameMode ?? "olympiade").toUpperCase()}`)
+      this.settingsText?.setText(
+        `[←/→] players: ${state.maxPlayers}   [M] mode: ${(state.gameMode ?? "olympiade").toUpperCase()}   ${visibility}`
+      )
     } else {
-      this.settingsText?.setText(`Mode: ${(state.gameMode ?? "olympiade").toUpperCase()}   Players: ${state.maxPlayers}`)
+      this.settingsText?.setText(
+        `Mode: ${(state.gameMode ?? "olympiade").toUpperCase()}   Players: ${state.maxPlayers}   ${visibility}`
+      )
     }
 
     const connected = [...state.players.values()].filter((p) => p.isConnected)
@@ -237,7 +285,7 @@ export class LobbyScene extends Phaser.Scene {
       if (this.preJoinedRoom) {
         this.room = this.preJoinedRoom
       } else if (this.joinMode === "create") {
-        this.room = await createRoom(name, this.characterId)
+        this.room = await createRoom(name, this.characterId, this.createIsPrivate)
       } else if (this.joinMode === "join") {
         this.room = await joinByCode(name, this.characterId, this.roomCode)
       } else {
