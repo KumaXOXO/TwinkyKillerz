@@ -423,6 +423,16 @@ describe("Single game mode", () => {
     room["handleSelectGame"](gm, { game: "chess" })
     expect(room.state.phase).toBe("lobby")
   })
+
+  it("player_ready is ignored during game_select phase", async () => {
+    const { room, clients } = makeSingleRoom(2)
+    for (const c of clients) room["handlePlayerReady"](c, {})
+    // phase is now game_select
+    expect(room.state.phase).toBe("game_select")
+    // sending player_ready again should not change phase
+    for (const c of clients) room["handlePlayerReady"](c, {})
+    expect(room.state.phase).toBe("game_select")
+  })
 })
 
 describe("shared constants", () => {

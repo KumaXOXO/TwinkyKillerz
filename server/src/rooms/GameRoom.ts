@@ -117,6 +117,7 @@ export class GameRoom extends Room<GameState> {
   onDispose() {}
 
   private handlePlayerReady(client: Client, _msg: unknown) {
+    if (this.state.phase !== "lobby" && this.state.phase !== "result") return
     const player = this.state.players.get(client.sessionId)
     if (player) player.isReady = true
     this.readyPlayers.add(client.sessionId)

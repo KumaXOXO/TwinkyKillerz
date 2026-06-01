@@ -83,5 +83,6 @@ export class GameSelectScene extends Phaser.Scene {
       this.room.onStateChange.remove(this.stateChangeCallback)
       this.stateChangeCallback = null
     }
+    this.input.keyboard?.removeAllListeners()
   }
 }
