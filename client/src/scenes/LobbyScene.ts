@@ -80,7 +80,7 @@ export class LobbyScene extends Phaser.Scene {
       return
     }
     sounds.menuConfirm()
-    const original = this.roomCodeText.text
+    const original = `ROOM: ${code}`
     this.roomCodeText.setText("COPIED!")
     this.time.delayedCall(900, () => {
       try {

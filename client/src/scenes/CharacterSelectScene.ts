@@ -173,6 +173,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   shutdown() {
     this.refreshTimer?.remove(false)
     this.refreshTimer = undefined
+    this.joinPhase = "character"
     this.input.keyboard!.off("keydown", this.handleKey, this)
   }
 

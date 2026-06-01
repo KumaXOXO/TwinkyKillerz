@@ -94,9 +94,13 @@ export class GameRoom extends Room<GameState> {
       this.handleConnect4Drop(client, msg)
     )
     this.onMessage("select_game", (client, msg) => this.handleSelectGame(client, msg))
-    await this.updateRoomMetadata()
-    if (this.state.isPrivate) {
-      await this.setPrivate(true)
+    try {
+      await this.updateRoomMetadata()
+      if (this.state.isPrivate) {
+        await this.setPrivate(true)
+      }
+    } catch (err) {
+      console.error("onCreate metadata setup failed", err)
     }
   }
 

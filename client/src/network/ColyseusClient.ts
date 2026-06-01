@@ -36,27 +36,24 @@ export async function createRoom(
   return _room
 }
 
-// NOTE: private rooms are hidden from getAvailableRooms by server (setPrivate).
-// To join private lobbies by code, server matchmaker needs a `filterBy: ["roomCode"]`
-// option configured in the game registration. Future enhancement.
 export async function joinByCode(
   name: string,
   characterId: string,
   roomCode: string,
 ): Promise<Room<GameState>> {
   const code = roomCode.toUpperCase().trim()
-  const rooms = await getClient().getAvailableRooms<{
-    roomCode: string
-    playerCount: number
-    maxPlayers: number
-    isPrivate: boolean
-  }>("game_room")
-  const target = rooms.find(r => r.metadata?.roomCode === code)
-  if (!target) throw new Error("Room not found")
-  if (target.metadata && target.metadata.playerCount >= target.metadata.maxPlayers) {
-    throw new Error("Room is full")
+  try {
+    _room = await getClient().join<GameState>("game_room", { roomCode: code, name, characterId })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Join failed"
+    if (msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("no rooms")) {
+      throw new Error("Room not found")
+    }
+    if (msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("full")) {
+      throw new Error("Room is full")
+    }
+    throw new Error(msg)
   }
-  _room = await getClient().joinById<GameState>(target.roomId, { name, characterId })
   return _room
 }
 

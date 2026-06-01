@@ -8,7 +8,7 @@ const gameServer = new Server({
   transport: new WebSocketTransport(),
 })
 
-gameServer.define("game_room", GameRoom)
+gameServer.define("game_room", GameRoom).filterBy(["roomCode"])
 
 gameServer.listen(port).then(() => {
   console.log(`Server running on ws://localhost:${port}`)
