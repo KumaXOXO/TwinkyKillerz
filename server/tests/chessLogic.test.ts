@@ -156,6 +156,16 @@ describe("queen moves", () => {
   })
 })
 
+describe("boardFlip helpers", () => {
+  it("boardFlip maps row 0 to row 7 when flipped", () => {
+    const boardRow = (r: number, flipped: boolean) => flipped ? 7 - r : r
+    expect(boardRow(0, true)).toBe(7)
+    expect(boardRow(7, true)).toBe(0)
+    expect(boardRow(0, false)).toBe(0)
+    expect(boardRow(3, true)).toBe(4)
+  })
+})
+
 describe("buildInitialBoard", () => {
   it("creates 16 pieces per player in 2P mode", () => {
     const { pieces } = buildInitialBoard(["alice", "bob"])

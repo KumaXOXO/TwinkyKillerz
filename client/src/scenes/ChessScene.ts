@@ -30,6 +30,25 @@ export class ChessScene extends Phaser.Scene {
   private prevScores: Map<string, number> = new Map()
   private wasInCheck = false
   private cheatHUD!: CheatHUD
+  private boardFlipped = false
+
+  private boardRow(r: number): number {
+    return this.boardFlipped ? 7 - r : r
+  }
+
+  private boardCol(c: number): number {
+    return this.boardFlipped ? 7 - c : c
+  }
+
+  private computeBoardFlip(): void {
+    const order = [...this.room.state.chess.playerOrder] as string[]
+    const myIdx = order.indexOf(this.room.sessionId)
+    if (order.length <= 2) {
+      this.boardFlipped = myIdx === 1
+    } else {
+      this.boardFlipped = myIdx >= 2
+    }
+  }
 
   constructor() {
     super({ key: "ChessScene" })
@@ -61,6 +80,7 @@ export class ChessScene extends Phaser.Scene {
     this.checkText = this.add.text(400, 582, "", { fontSize: "16px", color: "#ff4444", fontStyle: "bold" }).setOrigin(0.5, 1)
 
     this.buildPawnDirs()
+    this.computeBoardFlip()
     this.buildPlayerColors()
     this.buildScorePanel()
     this.renderPieces()
@@ -176,8 +196,8 @@ export class ChessScene extends Phaser.Scene {
     const currentIds = new Set<string>()
     this.room.state.chess.pieces.forEach((piece: ChessPiece, id: string) => {
       currentIds.add(id)
-      const x = BOARD_OFFSET_X + piece.col * CELL_SIZE + CELL_SIZE / 2
-      const y = BOARD_OFFSET_Y + piece.row * CELL_SIZE + CELL_SIZE / 2
+      const x = BOARD_OFFSET_X + this.boardCol(piece.col) * CELL_SIZE + CELL_SIZE / 2
+      const y = BOARD_OFFSET_Y + this.boardRow(piece.row) * CELL_SIZE + CELL_SIZE / 2
       const symbol = this.getPieceSymbol(piece)
       const color = this.playerColors[piece.ownerId] ?? "#ffffff"
 
@@ -239,8 +259,8 @@ export class ChessScene extends Phaser.Scene {
       this.checkText.setText("CHECK!")
       const king = pieces.find(p => p.ownerId === myId && p.pieceType === "king" && !p.isGhost)
       if (king) {
-        const x = BOARD_OFFSET_X + king.col * CELL_SIZE
-        const y = BOARD_OFFSET_Y + king.row * CELL_SIZE
+        const x = BOARD_OFFSET_X + this.boardCol(king.col) * CELL_SIZE
+        const y = BOARD_OFFSET_Y + this.boardRow(king.row) * CELL_SIZE
         this.checkGraphics.fillStyle(0xff2222, 0.45)
         this.checkGraphics.fillRect(x, y, CELL_SIZE, CELL_SIZE)
       }
@@ -279,9 +299,11 @@ export class ChessScene extends Phaser.Scene {
   }
 
   private handleBoardClick(sx: number, sy: number) {
-    const col = Math.floor((sx - BOARD_OFFSET_X) / CELL_SIZE)
-    const row = Math.floor((sy - BOARD_OFFSET_Y) / CELL_SIZE)
-    if (row < 0 || row > 7 || col < 0 || col > 7) return
+    const displayCol = Math.floor((sx - BOARD_OFFSET_X) / CELL_SIZE)
+    const displayRow = Math.floor((sy - BOARD_OFFSET_Y) / CELL_SIZE)
+    if (displayRow < 0 || displayRow > 7 || displayCol < 0 || displayCol > 7) return
+    const col = this.boardFlipped ? 7 - displayCol : displayCol
+    const row = this.boardFlipped ? 7 - displayRow : displayRow
 
     const myId = this.room.sessionId
     if (this.room.state.chess.turnPlayerId !== myId) return
@@ -341,8 +363,8 @@ export class ChessScene extends Phaser.Scene {
   private drawHighlights() {
     this.highlightGraphics.clear()
     for (const [r, c] of this.validMovesCache) {
-      const x = BOARD_OFFSET_X + c * CELL_SIZE
-      const y = BOARD_OFFSET_Y + r * CELL_SIZE
+      const x = BOARD_OFFSET_X + this.boardCol(c) * CELL_SIZE
+      const y = BOARD_OFFSET_Y + this.boardRow(r) * CELL_SIZE
       if (this.captureMovesCache.has(`${r},${c}`)) {
         this.highlightGraphics.fillStyle(0xff6644, 0.5)
       } else {
@@ -353,8 +375,8 @@ export class ChessScene extends Phaser.Scene {
     if (this.selectedPieceId) {
       const src = this.getPieceDataById(this.selectedPieceId)
       if (src) {
-        const x = BOARD_OFFSET_X + src.col * CELL_SIZE
-        const y = BOARD_OFFSET_Y + src.row * CELL_SIZE
+        const x = BOARD_OFFSET_X + this.boardCol(src.col) * CELL_SIZE
+        const y = BOARD_OFFSET_Y + this.boardRow(src.row) * CELL_SIZE
         this.highlightGraphics.fillStyle(0xffff00, 0.55)
         this.highlightGraphics.fillRect(x, y, CELL_SIZE, CELL_SIZE)
       }
