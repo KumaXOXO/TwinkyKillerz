@@ -415,6 +415,14 @@ describe("Single game mode", () => {
     expect(room.state.phase).toBe("minigame")
     expect(room.state.olympiade.currentMinigame).toBe("connect4")
   })
+
+  it("select_game is ignored when phase is not game_select", async () => {
+    const { room, clients } = makeSingleRoom(2)
+    // phase is still "lobby" — do NOT call player_ready
+    const gm = clients.find(c => room.state.players.get(c.sessionId)?.isGamemaster)!
+    room["handleSelectGame"](gm, { game: "chess" })
+    expect(room.state.phase).toBe("lobby")
+  })
 })
 
 describe("shared constants", () => {

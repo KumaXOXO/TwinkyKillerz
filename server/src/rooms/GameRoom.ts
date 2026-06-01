@@ -141,6 +141,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   private handleSelectGame(client: Client, msg: { game: string }): void {
+    if (this.state.phase !== "game_select") return
     const player = this.state.players.get(client.sessionId)
     if (!player?.isGamemaster) return
     if (!(MINIGAMES as readonly string[]).includes(msg.game)) return
