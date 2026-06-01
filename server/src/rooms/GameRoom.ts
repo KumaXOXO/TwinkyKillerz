@@ -95,6 +95,9 @@ export class GameRoom extends Room<GameState> {
     )
     this.onMessage("select_game", (client, msg) => this.handleSelectGame(client, msg))
     await this.updateRoomMetadata()
+    if (this.state.isPrivate) {
+      await this.setPrivate(true)
+    }
   }
 
   onAuth(_client: Client, _options: unknown): boolean {
@@ -122,7 +125,7 @@ export class GameRoom extends Room<GameState> {
     player.characterId = options.characterId ?? "default"
     player.isGamemaster = this.state.players.size === 0
     this.state.players.set(client.sessionId, player)
-    this.updateRoomMetadata()
+    this.updateRoomMetadata().catch(err => console.error("metadata update failed", err))
   }
 
   onLeave(client: Client, _consented: boolean) {
@@ -132,7 +135,7 @@ export class GameRoom extends Room<GameState> {
       player.isReady = false
     }
     this.readyPlayers.delete(client.sessionId)
-    this.updateRoomMetadata()
+    this.updateRoomMetadata().catch(err => console.error("metadata update failed", err))
   }
 
   onDispose() {}
@@ -198,7 +201,7 @@ export class GameRoom extends Room<GameState> {
       const v = Math.max(2, Math.min(4, Math.floor(msg.maxPlayers)))
       this.state.maxPlayers = v
       this.maxClients = v
-      this.updateRoomMetadata()
+      this.updateRoomMetadata().catch(err => console.error("metadata update failed", err))
     }
     if (msg.gameMode !== undefined && ["olympiade", "single"].includes(msg.gameMode)) {
       this.state.gameMode = msg.gameMode
