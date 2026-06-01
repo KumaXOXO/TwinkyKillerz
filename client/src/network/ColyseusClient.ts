@@ -1,6 +1,14 @@
 import { Client, Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 
+export interface LobbyInfo {
+  roomId: string
+  roomCode: string
+  playerCount: number
+  maxPlayers: number
+  isPrivate: boolean
+}
+
 const WS_URL = (import.meta.env as Record<string, string>)["VITE_SERVER_URL"] ?? "ws://localhost:2567"
 
 let _client: Client | null = null
@@ -22,19 +30,32 @@ export async function joinGame(
 export async function createRoom(
   name: string,
   characterId: string,
+  isPrivate: boolean = false,
 ): Promise<Room<GameState>> {
-  _room = await getClient().create<GameState>("game_room", { name, characterId })
+  _room = await getClient().create<GameState>("game_room", { name, characterId, isPrivate })
   return _room
 }
 
+// NOTE: private rooms are hidden from getAvailableRooms by server (setPrivate).
+// To join private lobbies by code, server matchmaker needs a `filterBy: ["roomCode"]`
+// option configured in the game registration. Future enhancement.
 export async function joinByCode(
   name: string,
   characterId: string,
   roomCode: string,
 ): Promise<Room<GameState>> {
-  const rooms = await getClient().getAvailableRooms<{ roomCode: string }>("game_room")
-  const target = rooms.find(r => r.metadata?.roomCode === roomCode.toUpperCase().trim())
+  const code = roomCode.toUpperCase().trim()
+  const rooms = await getClient().getAvailableRooms<{
+    roomCode: string
+    playerCount: number
+    maxPlayers: number
+    isPrivate: boolean
+  }>("game_room")
+  const target = rooms.find(r => r.metadata?.roomCode === code)
   if (!target) throw new Error("Room not found")
+  if (target.metadata && target.metadata.playerCount >= target.metadata.maxPlayers) {
+    throw new Error("Room is full")
+  }
   _room = await getClient().joinById<GameState>(target.roomId, { name, characterId })
   return _room
 }
@@ -85,4 +106,31 @@ export function sendConnect4Drop(col: number): void {
 
 export function sendSelectGame(game: string): void {
   _room?.send("select_game", { game })
+}
+
+export async function getPublicLobbies(): Promise<LobbyInfo[]> {
+  const rooms = await getClient().getAvailableRooms<{
+    roomCode: string
+    playerCount: number
+    maxPlayers: number
+    isPrivate: boolean
+  }>("game_room")
+  return rooms
+    .filter(r => r.metadata && !r.metadata.isPrivate)
+    .map(r => ({
+      roomId: r.roomId,
+      roomCode: r.metadata!.roomCode,
+      playerCount: r.metadata!.playerCount,
+      maxPlayers: r.metadata!.maxPlayers,
+      isPrivate: r.metadata!.isPrivate,
+    }))
+}
+
+export async function joinLobbyById(
+  name: string,
+  characterId: string,
+  roomId: string,
+): Promise<Room<GameState>> {
+  _room = await getClient().joinById<GameState>(roomId, { name, characterId })
+  return _room
 }
