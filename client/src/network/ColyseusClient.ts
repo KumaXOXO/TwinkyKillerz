@@ -82,3 +82,7 @@ export function sendPlaceChip(fieldIndex: number): void {
 export function sendConnect4Drop(col: number): void {
   _room?.send("connect4_drop", { col })
 }
+
+export function sendSelectGame(game: string): void {
+  _room?.send("select_game", { game })
+}
