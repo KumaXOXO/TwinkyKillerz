@@ -1,0 +1,94 @@
+<h2>Welches Spielgefühl? 🎮</h2>
+<p class="subtitle">Wähle die Richtung, die am besten zu deiner Vision passt</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="brawler" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:16px;font-family:monospace;font-size:12px;line-height:1.6;color:#e0e0e0;min-height:120px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:#2d2d5e;border-radius:4px;padding:8px;text-align:center">
+          <div style="font-size:28px">🐸</div>
+          <div style="color:#00ff88;font-size:10px">HP ████░</div>
+        </div>
+        <div style="background:#5e2d2d;border-radius:4px;padding:8px;text-align:center">
+          <div style="font-size:28px">🐱</div>
+          <div style="color:#ff4444;font-size:10px">HP ██░░░</div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:8px;color:#ffcc00;font-size:11px">⚔️ ROUND 2 ⚔️</div>
+    </div>
+    <div class="card-body">
+      <h3>Arena Brawler</h3>
+      <p>2–8 Spieler kämpfen in kleinen Arenen. Cute Chars mit uniquen Moves. Kurze Matches (~3 min). Hohe Skill-Ceiling.</p>
+      <p class="label">Vorbild: Brawl Stars, Brawlhalla</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="battleroyale" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d1b0d;padding:16px;font-family:monospace;font-size:12px;line-height:1.6;color:#e0e0e0;min-height:120px">
+      <div style="background:#1a3a1a;border-radius:4px;padding:8px;position:relative">
+        <div style="display:flex;justify-content:space-around;font-size:22px">🐰 🦊 🐻 🐼</div>
+        <div style="text-align:center;margin-top:6px;color:#ff6600;font-size:10px">ZONE SHRINKS IN 30s</div>
+        <div style="border:2px dashed #ff6600;border-radius:50%;width:80%;height:60px;margin:4px auto;opacity:0.5"></div>
+      </div>
+      <div style="text-align:center;margin-top:6px;color:#aaffaa;font-size:11px">👥 8 ALIVE</div>
+    </div>
+    <div class="card-body">
+      <h3>Battle Royale (Mini)</h3>
+      <p>16–32 Spieler, schrumpfende Zone, Loot & Survive. Jeder Run anders. Spannung bis zum letzten Pixelchar.</p>
+      <p class="label">Vorbild: Survivio, Kirby BR</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="partygame" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a0a2e;padding:16px;font-family:monospace;font-size:12px;color:#e0e0e0;min-height:120px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="background:#2a1a4e;border-radius:4px;padding:6px;text-align:center;color:#ffaaff">🎪 MINI GAME #3</div>
+        <div style="display:flex;gap:6px">
+          <div style="background:#3a0a3a;border-radius:4px;padding:6px;flex:1;text-align:center">
+            <div style="font-size:18px">🐭</div>
+            <div style="color:#ffcc00;font-size:9px">★★★</div>
+          </div>
+          <div style="background:#3a0a3a;border-radius:4px;padding:6px;flex:1;text-align:center">
+            <div style="font-size:18px">🐹</div>
+            <div style="color:#aaaaaa;font-size:9px">★★☆</div>
+          </div>
+          <div style="background:#3a0a3a;border-radius:4px;padding:6px;flex:1;text-align:center">
+            <div style="font-size:18px">🐯</div>
+            <div style="color:#aaaaaa;font-size:9px">★☆☆</div>
+          </div>
+        </div>
+        <div style="text-align:center;color:#ff88ff;font-size:10px">DUCK RACE → BOMB DODGE → ???</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Party / Mini-Games</h3>
+      <p>Rotation von kurzen verrückten Minispielen. Jeder Run andere Reihenfolge. Chaos & Lachen. Sehr casual-friendly.</p>
+      <p class="label">Vorbild: Fall Guys, WarioWare Online</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="roguelite" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d1a;padding:16px;font-family:monospace;font-size:12px;color:#e0e0e0;min-height:120px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;gap:4px;justify-content:center">
+          <div style="background:#1a2a1a;border:1px solid #444;width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px">🐸</div>
+          <div style="background:#1a2a1a;border:1px solid #444;width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px">🐺</div>
+          <div style="background:#2a1a1a;border:1px solid #666;width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px">👹</div>
+          <div style="background:#2a1a1a;border:1px solid #666;width:28px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:14px">💀</div>
+        </div>
+        <div style="text-align:center;color:#aaffaa;font-size:10px">FLOOR 3 — CHOOSE UPGRADE:</div>
+        <div style="display:flex;gap:4px">
+          <div style="background:#1a3a2a;border:1px solid #00ff88;border-radius:3px;padding:4px;flex:1;text-align:center;font-size:10px;color:#00ff88">🗡️ Dmg +20%</div>
+          <div style="background:#1a2a3a;border:1px solid #0088ff;border-radius:3px;padding:4px;flex:1;text-align:center;font-size:10px;color:#0088ff">🛡️ Shield</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Co-op Roguelite</h3>
+      <p>2–4 Spieler gemeinsam durch prozedural generierte Dungeons. Permadeath, Upgrades, jeder Run anders. Depth & Replayvalue.</p>
+      <p class="label">Vorbild: Enter the Gungeon, Hades (co-op mod)</p>
+    </div>
+  </div>
+
+</div>

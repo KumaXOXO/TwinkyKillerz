@@ -1,0 +1,160 @@
+client/src/scenes/CharacterSelectScene.ts | 172 +++++++++++++++++++++++++++---
+ 1 file changed, 160 insertions(+), 12 deletions(-)
+
+--- Changes ---
+
+client/src/scenes/CharacterSelectScene.ts
+  @@ -1,7 +1,7 @@
+  -import { joinByCode } from "../network/ColyseusClient"
+  +import { joinByCode, getPublicLobbies, joinLobbyById, type LobbyInfo } from "../network/ColyseusClient"
+   
+   const COLS = 3
+   const ROWS = 2
+  @@ -36,6 +36,11 @@ export class CharacterSelectScene extends Phaser.Scene {
+  +  private isPrivate = false
+  +  private privateBtn?: Phaser.GameObjects.Rectangle
+  +  private privateBtnLabel?: Phaser.GameObjects.Text
+  +  private lobbyRows: Phaser.GameObjects.GameObject[] = []
+  +  private refreshTimer?: Phaser.Time.TimerEvent
+     private createBtn!: Phaser.GameObjects.Rectangle
+     private createBtnLabel!: Phaser.GameObjects.Text
+     private joinBtn!: Phaser.GameObjects.Rectangle
+  @@ -134,6 +139,22 @@ export class CharacterSelectScene extends Phaser.Scene {
+  +    this.privateBtn = this.add
+  +      .rectangle(width / 2, btnY + 50, 220, 32, C.panel)
+  +      .setStrokeStyle(2, C.border)
+  +      .setInteractive({ useHandCursor: true })
+  +    this.privateBtnLabel = this.add
+  +      .text(width / 2, btnY + 50, "PRIVATE LOBBY: OFF", { fontSize: "12px", color: C.muted })
+  +      .setOrigin(0.5)
+  +    this.privateBtn.on("pointerover", () => this.privateBtn?.setFillStyle(0x1f1f3a))
+  +    this.privateBtn.on("pointerout", () => this.privateBtn?.setFillStyle(C.panel))
+  +    this.privateBtn.on("pointerdown", () => {
+  +      this.isPrivate = !this.isPrivate
+  +      this.privateBtnLabel?.setText(`PRIVATE LOBBY: ${this.isPrivate ? "ON" : "OFF"}`)
+  +      this.privateBtnLabel?.setColor(this.isPrivate ? C.text : C.muted)
+  +      sounds.menuNav()
+  +    })
+  +
+       this.refreshSelection()
+       this.refreshNameCursor()
+   
+  @@ -231,22 +252,148 @@ export class CharacterSelectScene extends Phaser.Scene {
+  -    const overlay = this.add.rectangle(width / 2, height / 2, 400, 160, 0x0d0d1a).setStrokeStyle(2, C.border).setDepth(10)
+  -    const title = this.add.text(width / 2, height / 2 - 50, "Enter Room Code:", { fontSize: "16px", color: C.text }).setOrigin(0.5).setDepth(11)
+  -    const inputBox = this.add.rectangle(width / 2, height / 2, 240, 44, C.panel).setStrokeStyle(2, C.border).setDepth(11)
+  -    const codeDisplay = this.add.text(width / 2, height / 2, "", { fontSize: "22px", color: C.text, fontStyle: "bold" }).setOrigin(0.5).setDepth(12)
+  -    const hint = this.add.text(width / 2, height / 2 + 50, "ENTER to join  |  ESC back", { fontSize: "12px", color: C.muted }).setOrigin(0.5).setDepth(11)
+  +    const overlay = this.add
+  +      .rectangle(width / 2, height / 2, 720, 460, 0x0d0d1a)
+  +      .setStrokeStyle(2, C.border)
+  +      .setDepth(10)
+  +    const title = this.add
+  +      .text(width / 2, height / 2 - 210, "JOIN A LOBBY", { fontSize: "18px", color: C.text, fontStyle: "bold" })
+  +      .setOrigin(0.5)
+  +      .setDepth(11)
+  +
+  +    const listTitle = this.add
+  +      .text(width / 2 - 170, height / 2 - 170, "PUBLIC LOBBIES", { fontSize: "13px", color: C.muted })
+  +      .setOrigin(0.5)
+  +      .setDepth(11)
+  +    const listBg = this.add
+  +      .rectangle(width / 2 - 170, height / 2 + 10, 320, 340, C.panel)
+  +      .setStrokeStyle(1, C.border)
+  +      .setDepth(11)
+  +
+  +    const codeTitle = this.add
+  +      .text(width / 2 + 170, height / 2 - 170, "OR ENTER CODE", { fontSize: "13px", color: C.muted })
+  +      .setOrigin(0.5)
+  +      .setDepth(11)
+  +    const codeBg = this.add
+  +      .rectangle(width / 2 + 170, height / 2 + 10, 320, 340, C.panel)
+  +      .setStrokeStyle(1, C.border)
+  +      .setDepth(11)
+  +    const codeInputBox = this.add
+  +      .rectangle(width / 2 + 170, height / 2 - 60, 240, 44, 0x0a0a16)
+  +      .setStrokeStyle(2, C.border)
+  +      .setDepth(12)
+  +    const codeDisplay = this.add
+  +      .text(width / 2 + 170, height / 2 - 60, "", { fontSize: "22px", color: C.text, fontStyle: "bold" })
+  +      .setOrigin(0.5)
+  +      .setDepth(13)
+  +    const codeHint = this.add
+  +      .text(width / 2 + 170, height / 2 + 10, "ENTER to join code", { fontSize: "12px", color: C.muted })
+  +      .setOrigin(0.5)
+  +      .setDepth(12)
+       const errText = this.add
+  -      .text(width / 2, height / 2 + 76, "", { fontSize: "13px", color: "#ff5555" })
+  +      .text(width / 2 + 170, height / 2 + 110, "", { fontSize: "13px", color: "#ff5555", wordWrap: { width: 280 }, align: "center" })
+  +      .setOrigin(0.5)
+  +      .setDepth(12)
+  +
+  +    const closeHint = this.add
+  +      .text(width / 2, height / 2 + 210, "ESC to close", { fontSize: "11px", color: C.muted })
+         .setOrigin(0.5)
+         .setDepth(11)
+  -    this.codeErrorText = errText
+   
+       this.codeDisplayText = codeDisplay
+  -    this.choiceGroup.push(overlay, title, inputBox, codeDisplay, hint, errText)
+  +    this.codeErrorText = errText
+  +    this.choiceGroup.push(overlay, title, listTitle, listBg, codeTitle, codeBg, codeInputBox, codeDisplay, codeHint, errText, closeHint)
+  +
+  +    this.refreshLobbyList()
+  +    this.refreshTimer = this.time.addEvent({
+  +      delay: 3000,
+  +      loop: true,
+  +      callback: () => this.refreshLobbyList(),
+  +    })
+  +  }
+  +
+  +  private async refreshLobbyList(): Promise<void> {
+  +    if (this.joinPhase !== "codeInput") return
+  +    const { width, height } = this.scale
+  +    let lobbies: LobbyInfo[] = []
+  +    try {
+  +      lobbies = await getPublicLobbies()
+  +    } catch {
+  +      lobbies = []
+  +    }
+  +    this.lobbyRows.forEach(o => (o as { destroy(): void }).destroy())
+  +    this.lobbyRows = []
+  +    const listX = width / 2 - 170
+  +    const startY = height / 2 - 140
+  +    if (lobbies.length === 0) {
+  +      const empty = this.add
+  +        .text(listX, height / 2 + 10, "No public lobbies yet.\nCreate one!", { fontSize: "13px", color: C.muted, align: "center" })
+  +        .setOrigin(0.5)
+  +        .setDepth(12)
+  +      this.lobbyRows.push(empty)
+  +      return
+  +    }
+  +    lobbies.slice(0, 8).forEach((lobby, idx) => {
+  +      const y = startY + idx * 38
+  +      const isFull = lobby.playerCount >= lobby.maxPlayers
+  +      const rowBg = this.add
+  +        .rectangle(listX, y, 300, 32, 0x0a0a16)
+  +        .setStrokeStyle(1, C.border)
+  +        .setDepth(12)
+  +      const label = this.add
+  +        .text(listX - 140, y, `${lobby.roomCode}  ${lobby.playerCount}/${lobby.maxPlayers}`, {
+  +          fontSize: "13px",
+  +          color: isFull ? "#ff5555" : C.text,
+  ... (47 lines truncated)
+  @@ -263,6 +410,7 @@ export class CharacterSelectScene extends Phaser.Scene {
+  +      isPrivate: this.isPrivate,
+       })
+     }
+   
+  @@ -287,9 +435,9 @@ export class CharacterSelectScene extends Phaser.Scene {
+  -      // No need to reset isConnecting on success — scene transitions away
+  -    } catch {
+  -      this.setCodeError("Room not found — check the code and retry")
+  +    } catch (err: unknown) {
+  +      const msg = err instanceof Error ? err.message : "Join failed"
+  +      this.setCodeError(msg)
+         this.typedCode = ""
+         this.updateCodeDisplay()
+         this.isConnecting = false
+  +160 -12
+[full diff: rtk git diff --no-compact]
