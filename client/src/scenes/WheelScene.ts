@@ -34,6 +34,7 @@ export class WheelScene extends Phaser.Scene {
   private inPlacementPhase = false
   private chipSidebarTexts: Map<string, Phaser.GameObjects.Text> = new Map()
   private _brakeHitZone: Phaser.GameObjects.Arc | null = null
+  private arrowSprite!: Phaser.GameObjects.Graphics
 
   constructor() {
     super({ key: "WheelScene" })
@@ -72,19 +73,17 @@ export class WheelScene extends Phaser.Scene {
     this.wheelContainer = this.add.container(width / 2, height / 2)
     this.buildWheel()
 
-    const arrow = this.add.graphics()
-    arrow.fillStyle(toHex(THEME.colors.primary))
-    arrow.fillTriangle(
-      width / 2, height / 2 - RADIUS - 10,
-      width / 2 - 12, height / 2 - RADIUS - 34,
-      width / 2 + 12, height / 2 - RADIUS - 34,
-    )
-    arrow.lineStyle(2, toHex(THEME.colors.white))
-    arrow.strokeTriangle(
-      width / 2, height / 2 - RADIUS - 10,
-      width / 2 - 12, height / 2 - RADIUS - 34,
-      width / 2 + 12, height / 2 - RADIUS - 34,
-    )
+    // Mechanical Hub Overlay
+    const hub = this.add.container(width / 2, height / 2)
+    const hubOuter = this.add.circle(0, 0, 30, toHex(THEME.colors.panel)).setStrokeStyle(3, toHex(THEME.colors.border))
+    const hubInner = this.add.circle(0, 0, 15, toHex(THEME.colors.bg)).setStrokeStyle(2, toHex(THEME.colors.secondary))
+    hub.add([hubOuter, hubInner])
+    hub.setDepth(10)
+
+    this.arrowSprite = this.add.graphics()
+    this.drawArrow(0)
+    this.arrowSprite.setPosition(width / 2, height / 2 - RADIUS - 25)
+    this.arrowSprite.setDepth(15)
 
     this.statusText = this.add
       .text(width / 2, height / 2 + RADIUS + 50, "", {
@@ -168,6 +167,15 @@ export class WheelScene extends Phaser.Scene {
     this.room.onStateChange(this.stateChangeCallback)
   }
 
+  private drawArrow(rotation: number) {
+    this.arrowSprite.clear()
+    this.arrowSprite.fillStyle(toHex(THEME.colors.primary))
+    this.arrowSprite.fillTriangle(0, 15, -12, -15, 12, -15)
+    this.arrowSprite.lineStyle(2, toHex(THEME.colors.white))
+    this.arrowSprite.strokeTriangle(0, 15, -12, -15, 12, -15)
+    this.arrowSprite.setRotation(rotation)
+  }
+
   update(_time: number, delta: number) {
     if (this.inPlacementPhase) {
       const remaining = Math.max(
@@ -194,16 +202,23 @@ export class WheelScene extends Phaser.Scene {
     }
 
     this.velocity = Math.max(0, this.velocity - WHEEL_BASE_DECEL * this.decelMult * (delta / 1000))
+    const prevAngle = this.angle
     this.angle += this.velocity * (delta / 1000)
     this.wheelContainer.setAngle(this.angle)
 
-    if (this.isSpinning && !this.isDone && this.velocity > 0) {
-      const now = this.time.now
-      const interval = Math.max(60, 300 - this.velocity * 0.3)
-      if (now - this.lastTickTime > interval) {
-        this.lastTickTime = now
-        sounds.wheelTick()
-      }
+    // Peg Tick Logic
+    const segmentSize = 360 / MINIGAMES.length
+    const currentSegment = Math.floor(((this.angle + 90) % 360) / segmentSize)
+    const prevSegment = Math.floor(((prevAngle + 90) % 360) / segmentSize)
+
+    if (currentSegment !== prevSegment && this.velocity > 0) {
+      sounds.wheelTick()
+      this.tweens.add({
+        targets: this.arrowSprite,
+        angle: { from: 15, to: 0 },
+        duration: 100,
+        ease: 'Back.easeOut'
+      })
     }
 
     if (this.velocity <= 0) {
@@ -378,18 +393,18 @@ export class WheelScene extends Phaser.Scene {
     const total = weights.reduce((s, w) => s + w, 0)
 
     const g = this.add.graphics()
-    const palette = [toHex(THEME.colors.panel), 0x1e3a5f, toHex(THEME.colors.border), 0x1b4e2d, 0x4e3a1b]
     let startAngle = -Math.PI / 2
 
     segments.forEach((game, i) => {
       const arc = (weights[i] / total) * Math.PI * 2
       const end = startAngle + arc
 
-      g.fillStyle(palette[i % palette.length])
+      const color = THEME.colors.segments[i % THEME.colors.segments.length]
+      g.fillStyle(toHex(color))
       g.slice(0, 0, RADIUS, startAngle, end, false)
       g.fillPath()
 
-      g.lineStyle(2, toHex(THEME.colors.secondary))
+      g.lineStyle(2, toHex(THEME.colors.white), 0.5)
       g.beginPath()
       g.moveTo(0, 0)
       g.lineTo(Math.cos(startAngle) * RADIUS, Math.sin(startAngle) * RADIUS)
@@ -399,8 +414,8 @@ export class WheelScene extends Phaser.Scene {
       const pct = Math.round((weights[i] / total) * 100)
       const label = this.add
         .text(
-          Math.cos(mid) * (RADIUS * 0.6),
-          Math.sin(mid) * (RADIUS * 0.6),
+          Math.cos(mid) * (RADIUS * 0.7),
+          Math.sin(mid) * (RADIUS * 0.7),
           `${game.toUpperCase()}\n${pct}%`,
           {
             fontFamily: THEME.fonts.header,
@@ -412,22 +427,22 @@ export class WheelScene extends Phaser.Scene {
         .setOrigin(0.5)
       this.wheelContainer.add(label)
 
+      // Small peg circles
+      const peg = this.add.circle(Math.cos(startAngle) * RADIUS, Math.sin(startAngle) * RADIUS, 4, toHex(THEME.colors.white))
+      this.wheelContainer.add(peg)
+
       startAngle = end
     })
 
-    g.lineStyle(4, toHex(THEME.colors.secondary))
+    g.lineStyle(6, toHex(THEME.colors.secondary))
     g.strokeCircle(0, 0, RADIUS)
-    g.fillStyle(toHex(THEME.colors.bg))
-    g.fillCircle(0, 0, 20)
-    g.strokeCircle(0, 0, 20)
-
     this.wheelContainer.addAt(g, 0)
 
     // Slow rotate idle
     this.tweens.add({
       targets: this.wheelContainer,
       angle: "+=360",
-      duration: 30000,
+      duration: 60000,
       repeat: -1
     });
   }
@@ -463,13 +478,13 @@ export class WheelScene extends Phaser.Scene {
     this.tweens.add({
       targets: this.wheelContainer,
       angle: snapAngle,
-      duration: 300,
-      ease: "Cubic.easeOut",
+      duration: 500,
+      ease: "Back.easeOut",
       onComplete: () => {
         void climax(this.juice, this, {
-          hitstopMs: 60,
-          shake: { intensity: 0.006, ms: 180 },
-          pop: { x: this.wheelContainer.x, y: this.wheelContainer.y, color: toHex(THEME.colors.primary), count: 20 },
+          hitstopMs: 120,
+          shake: { intensity: 0.01, ms: 250 },
+          pop: { x: this.wheelContainer.x, y: this.wheelContainer.y, color: toHex(THEME.colors.primary), count: 30 },
         }).then(() => {
           this.time.delayedCall(1800, () => sendWheelDone())
         })

@@ -8,17 +8,12 @@ import { CheatHUD } from "../utils/CheatHUD"
 import { initJuice, type JuiceConfig } from "../juice/index"
 import { punch } from "../juice/helpers"
 import { climax } from "../juice/climax"
+import { THEME, toHex } from "../utils/Theme"
+import { UIFactory } from "../utils/UIFactory"
 
 const CELL = 60
 const GRID_X = (800 - CONNECT4_COLS * CELL) / 2
 const GRID_Y = (600 - CONNECT4_ROWS * CELL) / 2 - 20
-
-const C = {
-  text: "#e8d5ff",
-  muted: "#7070a0",
-  empty: 0x1a1a2e,
-  border: 0x4422aa,
-}
 
 export class Connect4Scene extends Phaser.Scene {
   private room!: Room<GameState>
@@ -48,40 +43,56 @@ export class Connect4Scene extends Phaser.Scene {
     this.juice = initJuice()
     const { width, height } = this.scale
 
-    this.add
-      .text(width / 2, 24, "CONNECT 4", { fontSize: "22px", color: C.text, fontStyle: "bold" })
-      .setOrigin(0.5)
+    this.cameras.main.setPostPipeline('CRTPipeline')
+
+    UIFactory.createHeader(this, width / 2, 40, "CONNECT 4")
 
     const playerIds = [...this.room.state.connect4.playerOrder].filter((id): id is string => !!id)
     playerIds.forEach((id, i) => {
-      const raw = CHESS_PLAYER_COLORS[i % CHESS_PLAYER_COLORS.length] ?? "#ffffff"
-      this.playerColors[id] = parseInt(raw.replace("#", ""), 16)
+      const raw = i === 0 ? THEME.colors.primary : THEME.colors.secondary
+      this.playerColors[id] = toHex(raw)
     })
 
     // Color legend
     let legendX = GRID_X
     playerIds.forEach((id, i) => {
       const name = this.room.state.players.get(id)?.name ?? "?"
-      const color = CHESS_PLAYER_COLORS[i % CHESS_PLAYER_COLORS.length] ?? "#ffffff"
-      this.add.text(legendX, height - 16, `● ${name}`, { fontSize: "12px", color }).setOrigin(0, 1)
-      legendX += 110
+      const color = i === 0 ? THEME.colors.primary : THEME.colors.secondary
+      this.add.text(legendX, height - 16, `● ${name.toUpperCase()}`, {
+        fontFamily: THEME.fonts.body,
+        fontSize: "14px",
+        color
+      }).setOrigin(0, 1)
+      legendX += 140
     })
 
     this.drawBoard()
 
     this.statusText = this.add
-      .text(width / 2, height - 56, "", { fontSize: "16px", color: C.text })
+      .text(width / 2, height - 56, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "18px",
+        color: THEME.colors.white
+      })
       .setOrigin(0.5)
 
     this.timerText = this.add
-      .text(width / 2, height - 36, "", { fontSize: "13px", color: C.muted })
+      .text(width / 2, height - 36, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "14px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
 
     // Column numbers above grid
     for (let c = 0; c < CONNECT4_COLS; c++) {
       const x = GRID_X + c * CELL + CELL / 2
       const t = this.add
-        .text(x, GRID_Y - 20, `${c + 1}`, { fontSize: "13px", color: C.muted })
+        .text(x, GRID_Y - 20, `${c + 1}`, {
+          fontFamily: THEME.fonts.header,
+          fontSize: "12px",
+          color: THEME.colors.muted
+        })
         .setOrigin(0.5)
       this.colHints.push(t)
     }
@@ -113,9 +124,9 @@ export class Connect4Scene extends Phaser.Scene {
         const boardCenterX = GRID_X + (CONNECT4_COLS * CELL) / 2
         const boardCenterY = GRID_Y + (CONNECT4_ROWS * CELL) / 2
         void climax(this.juice, this, {
-          hitstopMs: 80,
-          shake: { intensity: 0.008, ms: 220 },
-          pop: { x: boardCenterX, y: boardCenterY, color: winColor, count: 14 },
+          hitstopMs: 100,
+          shake: { intensity: 0.01, ms: 250 },
+          pop: { x: boardCenterX, y: boardCenterY, color: winColor, count: 20 },
         }).then(() => {
           this.time.delayedCall(1800, () => {
             this.scene.start("ResultScene", { room: this.room })
@@ -132,7 +143,7 @@ export class Connect4Scene extends Phaser.Scene {
       0,
       Math.ceil((this.room.state.connect4.turnDeadline - Date.now()) / 1000),
     )
-    this.timerText?.setText(`${remaining}s`)
+    this.timerText?.setText(`TERMINAL LOCK: ${remaining}S`)
     this.cheatHUD?.update()
   }
 
@@ -149,19 +160,26 @@ export class Connect4Scene extends Phaser.Scene {
 
   private drawBoard() {
     const bg = this.add.graphics()
-    bg.fillStyle(C.border)
-    bg.fillRect(GRID_X - 6, GRID_Y - 6, CONNECT4_COLS * CELL + 12, CONNECT4_ROWS * CELL + 12)
+    bg.fillStyle(toHex(THEME.colors.border))
+    bg.fillRoundedRect(GRID_X - 10, GRID_Y - 10, CONNECT4_COLS * CELL + 20, CONNECT4_ROWS * CELL + 20, 8)
+    bg.lineStyle(4, toHex(THEME.colors.secondary))
+    bg.strokeRoundedRect(GRID_X - 10, GRID_Y - 10, CONNECT4_COLS * CELL + 20, CONNECT4_ROWS * CELL + 20, 8)
 
     for (let r = 0; r < CONNECT4_ROWS; r++) {
       for (let c = 0; c < CONNECT4_COLS; c++) {
         const g = this.add.graphics()
-        g.fillStyle(C.empty)
-        g.fillCircle(GRID_X + c * CELL + CELL / 2, GRID_Y + r * CELL + CELL / 2, CELL / 2 - 4)
+        g.fillStyle(toHex(THEME.colors.bg))
+        const x = GRID_X + c * CELL + CELL / 2
+        const y = GRID_Y + r * CELL + CELL / 2
+        g.fillCircle(x, y, CELL / 2 - 6)
+        // Inner detail ring
+        g.lineStyle(1, toHex(THEME.colors.border), 0.3)
+        g.strokeCircle(x, y, CELL / 2 - 10)
         this.cellGraphics.push(g)
       }
     }
 
-    // Invisible interactive column zones
+    // Interactive column zones
     for (let c = 0; c < CONNECT4_COLS; c++) {
       const zoneX = GRID_X + c * CELL + CELL / 2
       const zoneY = GRID_Y + (CONNECT4_ROWS * CELL) / 2
@@ -170,10 +188,10 @@ export class Connect4Scene extends Phaser.Scene {
         .setInteractive({ useHandCursor: true })
       zone.on("pointerover", () => {
         if (this.room.state.connect4.turnPlayerId === this.room.sessionId) {
-          this.colHints[c]?.setColor(C.text)
+          this.colHints[c]?.setColor(THEME.colors.primary)
         }
       })
-      zone.on("pointerout", () => this.colHints[c]?.setColor(C.muted))
+      zone.on("pointerout", () => this.colHints[c]?.setColor(THEME.colors.muted))
       zone.on("pointerdown", () => {
         if (this.room.state.connect4.turnPlayerId === this.room.sessionId) {
           sendConnect4Drop(c)
@@ -191,42 +209,72 @@ export class Connect4Scene extends Phaser.Scene {
         const prev = this.prevBoard[idx] ?? ""
         const g = this.cellGraphics[idx]
         if (!g) continue
-        g.clear()
-        const color = cell ? (this.playerColors[cell] ?? 0x888888) : C.empty
-        g.fillStyle(color)
-        g.fillCircle(GRID_X + c * CELL + CELL / 2, GRID_Y + r * CELL + CELL / 2, CELL / 2 - 4)
-        if (cell && !prev) this.animateDrop(c, r, color)
+
+        if (cell && !prev) {
+          const color = this.playerColors[cell] ?? 0x888888
+          this.animateDrop(c, r, color)
+        } else if (cell) {
+          const color = this.playerColors[cell] ?? 0x888888
+          g.clear()
+          g.fillStyle(color)
+          g.fillCircle(GRID_X + c * CELL + CELL / 2, GRID_Y + r * CELL + CELL / 2, CELL / 2 - 6)
+          // Glossy top shine
+          g.fillStyle(0xffffff, 0.2)
+          g.fillCircle(GRID_X + c * CELL + CELL / 2 - 6, GRID_Y + r * CELL + CELL / 2 - 6, 8)
+        }
       }
     }
     this.prevBoard = [...board].map(c => c ?? "")
   }
 
   private animateDrop(col: number, targetRow: number, color: number) {
-    const startY = GRID_Y + CELL / 2
+    const startY = GRID_Y - CELL
     const endY = GRID_Y + targetRow * CELL + CELL / 2
     const cx = GRID_X + col * CELL + CELL / 2
-    const r = CELL / 2 - 4
+    const radius = CELL / 2 - 6
     const idx = targetRow * CONNECT4_COLS + col
 
     sounds.connect4Drop()
     const g = this.add.graphics()
     g.fillStyle(color)
-    g.fillCircle(cx, 0, r)
+    g.fillCircle(cx, 0, radius)
+    // Shine detail
+    g.fillStyle(0xffffff, 0.2)
+    g.fillCircle(cx - 6, -6, 8)
+
     g.setPosition(0, startY)
     g.setDepth(10)
 
     this.tweens.add({
       targets: g,
       y: endY,
-      duration: 80 + targetRow * 35,
+      duration: 150 + targetRow * 40,
       ease: "Bounce.easeOut",
       onComplete: () => {
         g.destroy()
         sounds.connect4Thunk(targetRow * 8)
         const cell = this.cellGraphics[idx]
-        if (cell?.active) punch(this.juice, cell, 1.15, 110)
+        if (cell?.active) {
+          punch(this.juice, cell, 1.2, 120)
+          // Impact particles
+          this.emitImpactParticles(cx, endY, color)
+        }
       },
     })
+  }
+
+  private emitImpactParticles(x: number, y: number, color: number) {
+    const emitter = this.add.particles(x, y, "chess_particle", {
+      speed: { min: 40, max: 100 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      lifespan: 300,
+      quantity: 8,
+      tint: color,
+      stopAfter: 8,
+    })
+    this.time.delayedCall(400, () => emitter.destroy())
   }
 
   private updateStatus() {
@@ -234,14 +282,14 @@ export class Connect4Scene extends Phaser.Scene {
     if (state.phase === "result") {
       const winnerId = state.connect4.winnerId
       const name = winnerId ? (state.players.get(winnerId)?.name ?? "?") : null
-      this.statusText?.setText(name ? `${name} wins!` : "Draw!")
-      this.colHints.forEach(t => t.setColor(C.muted))
+      this.statusText?.setText(name ? `${name.toUpperCase()} DOMINATES` : "DRAW DETECTED")
+      this.colHints.forEach(t => t.setColor(THEME.colors.muted))
       return
     }
     const turnId = state.connect4.turnPlayerId
     const isMyTurn = turnId === this.room.sessionId
     const name = state.players.get(turnId)?.name ?? "?"
-    this.statusText?.setText(isMyTurn ? "Your turn! Press 1-7 to drop" : `${name}'s turn`)
-    this.colHints.forEach(t => t.setColor(isMyTurn ? C.text : C.muted))
+    this.statusText?.setText(isMyTurn ? "INPUT REQUIRED [1-7]" : `WAITING FOR ${name.toUpperCase()}`)
+    this.colHints.forEach(t => t.setColor(isMyTurn ? THEME.colors.primary : THEME.colors.muted))
   }
 }

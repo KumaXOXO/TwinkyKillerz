@@ -7,8 +7,10 @@ import { sendChessMove } from "../network/ColyseusClient"
 import { sounds } from "../utils/SoundManager"
 import { CheatHUD } from "../utils/CheatHUD"
 import { initJuice, type JuiceConfig } from "../juice/index"
-import { shake } from "../juice/helpers"
+import { shake, punch } from "../juice/helpers"
 import { climax } from "../juice/climax"
+import { THEME, toHex } from "../utils/Theme"
+import { UIFactory } from "../utils/UIFactory"
 
 const CELL_SIZE = 56
 const BOARD_OFFSET_X = (800 - CELL_SIZE * 8) / 2
@@ -77,12 +79,31 @@ export class ChessScene extends Phaser.Scene {
 
   create() {
     this.juice = initJuice()
+    this.cameras.main.setPostPipeline('CRTPipeline')
+
     this.drawBoard()
     this.checkGraphics = this.add.graphics()
     this.highlightGraphics = this.add.graphics()
-    this.turnText = this.add.text(400, 8, "", { fontSize: "16px", color: "#ffffff" }).setOrigin(0.5, 0)
-    this.timerText = this.add.text(400, 28, "", { fontSize: "13px", color: "#aaaaaa" }).setOrigin(0.5, 0)
-    this.checkText = this.add.text(400, 582, "", { fontSize: "16px", color: "#ff4444", fontStyle: "bold" }).setOrigin(0.5, 1)
+
+    UIFactory.createHeader(this, 400, 30, "CHESS PROTOCOL")
+
+    this.turnText = this.add.text(400, 60, "", {
+      fontFamily: THEME.fonts.body,
+      fontSize: "18px",
+      color: THEME.colors.white
+    }).setOrigin(0.5, 0)
+
+    this.timerText = this.add.text(400, 85, "", {
+      fontFamily: THEME.fonts.header,
+      fontSize: "14px",
+      color: THEME.colors.muted
+    }).setOrigin(0.5, 0)
+
+    this.checkText = this.add.text(400, 582, "", {
+      fontFamily: THEME.fonts.header,
+      fontSize: "20px",
+      color: THEME.colors.primary,
+    }).setOrigin(0.5, 1)
 
     this.buildPawnDirs()
     this.computeBoardFlip()
@@ -104,9 +125,9 @@ export class ChessScene extends Phaser.Scene {
         const kingX = oppKing ? BOARD_OFFSET_X + this.boardCol(oppKing.col) * CELL_SIZE + CELL_SIZE / 2 : width / 2
         const kingY = oppKing ? BOARD_OFFSET_Y + this.boardRow(oppKing.row) * CELL_SIZE + CELL_SIZE / 2 : height / 2
         void climax(this.juice, this, {
-          hitstopMs: 80,
-          shake: { intensity: 0.009, ms: 240 },
-          pop: { x: kingX, y: kingY, color: 0xffdd44, count: 16 },
+          hitstopMs: 150,
+          shake: { intensity: 0.012, ms: 300 },
+          pop: { x: kingX, y: kingY, color: toHex(THEME.colors.warning), count: 25 },
         }).then(() => {
           this.time.delayedCall(1800, () => {
             this.scene.start("ResultScene", { room: this.room })
@@ -114,6 +135,17 @@ export class ChessScene extends Phaser.Scene {
         })
         return
       }
+
+      // Detect captures for high juice
+      const currentPieces = state.chess.pieces
+      for (const [id, _] of this.pieceTexts.entries()) {
+        if (!currentPieces.has(id)) {
+          // Capture happened!
+          this.flashScreen(0xffffff, 0.2)
+          shake(this.juice, this, 0.008, 120)
+        }
+      }
+
       this.renderPieces()
       this.updateTurnText()
       this.updateCheckState()
@@ -133,14 +165,22 @@ export class ChessScene extends Phaser.Scene {
   }
 
   private drawBoard() {
+    const bg = this.add.graphics()
+    bg.fillStyle(toHex(THEME.colors.border))
+    bg.fillRect(BOARD_OFFSET_X - 4, BOARD_OFFSET_Y - 4, CELL_SIZE * 8 + 8, CELL_SIZE * 8 + 8)
+
     const g = this.add.graphics()
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 8; c++) {
         const x = BOARD_OFFSET_X + c * CELL_SIZE
         const y = BOARD_OFFSET_Y + r * CELL_SIZE
         const light = (r + c) % 2 === 0
-        g.fillStyle(light ? 0xd4b06a : 0x8a5a2a, 1)
+        g.fillStyle(light ? toHex(THEME.colors.panel) : toHex(THEME.colors.bg), 1)
         g.fillRect(x, y, CELL_SIZE, CELL_SIZE)
+
+        // Faint grid lines
+        g.lineStyle(1, toHex(THEME.colors.border), 0.2)
+        g.strokeRect(x, y, CELL_SIZE, CELL_SIZE)
       }
     }
   }
@@ -148,12 +188,10 @@ export class ChessScene extends Phaser.Scene {
   private buildPawnDirs() {
     const order = [...this.room.state.chess.playerOrder] as string[]
     if (order.length <= 2) {
-      // 2P: white (idx 0) advances up (-1), black (idx 1) advances down (+1)
       order.forEach((id, idx) => {
         this.pawnDirs[id] = idx === 0 ? -1 : 1
       })
     } else {
-      // 3-4P: use corner order from shared constants
       order.forEach((id, idx) => {
         const corner = CHESS_CORNERS[idx % CHESS_CORNERS.length]!
         this.pawnDirs[id] = CHESS_PAWN_DIRS[corner]
@@ -173,7 +211,11 @@ export class ChessScene extends Phaser.Scene {
     this.scoreTexts = []
     order.forEach((id, idx) => {
       const color = this.playerColors[id] ?? "#ffffff"
-      const t = this.add.text(6, 60 + idx * 22, "", { fontSize: "13px", color })
+      const t = this.add.text(10, 110 + idx * 24, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "15px",
+        color
+      })
       this.scoreTexts.push(t)
     })
     this.updateScorePanel()
@@ -190,11 +232,11 @@ export class ChessScene extends Phaser.Scene {
       const score = player?.score ?? 0
       const prev = this.prevScores.get(id)
       if (prev !== undefined && score > prev) {
-        this.spawnFloatingScore(t.x + 80, t.y, score - prev)
+        this.spawnFloatingScore(t.x + 100, t.y, score - prev)
       }
       this.prevScores.set(id, score)
-      const elim = eliminated.has(id) ? " ✗" : ""
-      t.setText(`${name}: ${score}${elim}`)
+      const elim = eliminated.has(id) ? " [DETACHED]" : ""
+      t.setText(`${name.toUpperCase()}: ${score}${elim}`)
     })
   }
 
@@ -220,13 +262,17 @@ export class ChessScene extends Phaser.Scene {
 
       let text = this.pieceTexts.get(id)
       if (!text) {
-        text = this.add.text(x, y, symbol, { fontSize: "28px", color }).setOrigin(0.5)
+        text = this.add.text(x, y, symbol, {
+          fontFamily: THEME.fonts.body,
+          fontSize: "32px",
+          color
+        }).setOrigin(0.5).setShadow(2, 2, '#000', 0)
         this.pieceTexts.set(id, text)
       } else {
         const prev = this.prevPositions.get(id)
         if (prev && (prev.x !== x || prev.y !== y)) {
           sounds.pieceMove()
-          this.tweens.add({ targets: text, x, y, duration: 180, ease: "Cubic.easeOut" })
+          this.tweens.add({ targets: text, x, y, duration: 200, ease: "Back.easeOut" })
         } else {
           text.setPosition(x, y)
         }
@@ -250,16 +296,16 @@ export class ChessScene extends Phaser.Scene {
 
   private emitCaptureParticles(x: number, y: number) {
     const emitter = this.add.particles(x, y, "chess_particle", {
-      speed: { min: 50, max: 130 },
+      speed: { min: 60, max: 180 },
       angle: { min: 0, max: 360 },
-      scale: { start: 1.4, end: 0 },
+      scale: { start: 1.5, end: 0 },
       alpha: { start: 1, end: 0 },
-      lifespan: 420,
-      quantity: 12,
-      tint: 0xffdd88,
-      stopAfter: 12,
+      lifespan: 500,
+      quantity: 16,
+      tint: toHex(THEME.colors.primary),
+      stopAfter: 16,
     })
-    this.time.delayedCall(500, () => emitter.destroy())
+    this.time.delayedCall(600, () => emitter.destroy())
   }
 
   private updateCheckState() {
@@ -271,15 +317,15 @@ export class ChessScene extends Phaser.Scene {
     if (inCheck) {
       if (!this.wasInCheck) {
         sounds.check()
-        this.flashScreen(0xff0000, 0.35)
-        shake(this.juice, this, 0.005, 160)
+        this.flashScreen(toHex(THEME.colors.primary), 0.3)
+        shake(this.juice, this, 0.008, 200)
       }
-      this.checkText.setText("CHECK!")
+      this.checkText.setText("CORE THREAT DETECTED")
       const king = pieces.find(p => p.ownerId === myId && p.pieceType === "king" && !p.isGhost)
       if (king) {
         const x = BOARD_OFFSET_X + this.boardCol(king.col) * CELL_SIZE
         const y = BOARD_OFFSET_Y + this.boardRow(king.row) * CELL_SIZE
-        this.checkGraphics.fillStyle(0xff2222, 0.45)
+        this.checkGraphics.fillStyle(toHex(THEME.colors.primary), 0.4)
         this.checkGraphics.fillRect(x, y, CELL_SIZE, CELL_SIZE)
       }
     } else {
@@ -297,21 +343,26 @@ export class ChessScene extends Phaser.Scene {
       targets: flash,
       alpha: 0,
       duration: 400,
-      ease: "Cubic.easeOut",
+      ease: "Power2",
       onComplete: () => flash.destroy(),
     })
   }
 
   private spawnFloatingScore(x: number, y: number, delta: number) {
     const text = this.add
-      .text(x, y, `+${delta}`, { fontSize: "14px", color: "#ffff44", fontStyle: "bold" })
+      .text(x, y, `+${delta}`, {
+        fontFamily: THEME.fonts.header,
+        fontSize: "14px",
+        color: THEME.colors.warning,
+        fontStyle: "bold"
+      })
       .setOrigin(0, 0.5)
     this.tweens.add({
       targets: text,
-      y: y - 32,
+      y: y - 40,
       alpha: 0,
-      duration: 900,
-      ease: "Cubic.easeOut",
+      duration: 1200,
+      ease: "Power1",
       onComplete: () => text.destroy(),
     })
   }
@@ -350,6 +401,7 @@ export class ChessScene extends Phaser.Scene {
         if (dest && dest.ownerId !== myId) this.captureMovesCache.add(`${r},${c}`)
       }
       this.drawHighlights()
+      sounds.menuNav()
     } else {
       this.selectedPieceId = null
       this.validMovesCache = []
@@ -384,19 +436,23 @@ export class ChessScene extends Phaser.Scene {
       const x = BOARD_OFFSET_X + this.boardCol(c) * CELL_SIZE
       const y = BOARD_OFFSET_Y + this.boardRow(r) * CELL_SIZE
       if (this.captureMovesCache.has(`${r},${c}`)) {
-        this.highlightGraphics.fillStyle(0xff6644, 0.5)
+        this.highlightGraphics.fillStyle(toHex(THEME.colors.primary), 0.5)
       } else {
-        this.highlightGraphics.fillStyle(0xffff00, 0.35)
+        this.highlightGraphics.fillStyle(toHex(THEME.colors.secondary), 0.35)
       }
       this.highlightGraphics.fillRect(x, y, CELL_SIZE, CELL_SIZE)
+
+      // Dot indicator
+      this.highlightGraphics.fillStyle(0xffffff, 0.5)
+      this.highlightGraphics.fillCircle(x + CELL_SIZE/2, y + CELL_SIZE/2, 4)
     }
     if (this.selectedPieceId) {
       const src = this.getPieceDataById(this.selectedPieceId)
       if (src) {
         const x = BOARD_OFFSET_X + this.boardCol(src.col) * CELL_SIZE
         const y = BOARD_OFFSET_Y + this.boardRow(src.row) * CELL_SIZE
-        this.highlightGraphics.fillStyle(0xffff00, 0.55)
-        this.highlightGraphics.fillRect(x, y, CELL_SIZE, CELL_SIZE)
+        this.highlightGraphics.lineStyle(2, toHex(THEME.colors.primary), 1)
+        this.highlightGraphics.strokeRect(x, y, CELL_SIZE, CELL_SIZE)
       }
     }
   }
@@ -405,11 +461,11 @@ export class ChessScene extends Phaser.Scene {
     const turnId = this.room.state.chess.turnPlayerId
     const myId = this.room.sessionId
     if (turnId === myId) {
-      this.turnText.setText("YOUR TURN").setStyle({ color: "#ffff44" })
+      this.turnText.setText("ACCESS GRANTED - YOUR TURN").setStyle({ color: THEME.colors.primary })
     } else {
       const player = this.room.state.players.get(turnId)
       const name = player?.name ?? "..."
-      this.turnText.setText(`${name}'s turn`).setStyle({ color: "#aaaaaa" })
+      this.turnText.setText(`LINK ESTABLISHED - ${name.toUpperCase()}`).setStyle({ color: THEME.colors.muted })
     }
   }
 
@@ -417,7 +473,7 @@ export class ChessScene extends Phaser.Scene {
     const remaining = Math.max(0, this.room.state.chess.turnDeadline - Date.now())
     const secs = Math.ceil(remaining / 1000)
     const urgent = secs <= 10 && this.room.state.chess.turnPlayerId === this.room.sessionId
-    this.timerText.setText(`${secs}s`).setStyle({ color: urgent ? "#ff4444" : "#888888" })
+    this.timerText.setText(`LOCKOUT: ${secs}S`).setStyle({ color: urgent ? "#ff4444" : THEME.colors.muted })
     this.cheatHUD?.update()
   }
 

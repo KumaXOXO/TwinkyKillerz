@@ -16,6 +16,8 @@ export class LobbyScene extends Phaser.Scene {
   private joinMode: "create" | "join" | "joinOrCreate" | "existing" = "joinOrCreate"
   private roomCode = ""
   private createIsPrivate = false
+  private createMaxPlayers = 2
+  private createGameMode = "olympiade"
   private preJoinedRoom: Room<GameState> | null = null
   private typedChat = ""
   private cursorVisible = true
@@ -23,6 +25,7 @@ export class LobbyScene extends Phaser.Scene {
   private roomCodeText!: Phaser.GameObjects.Text
   private chatLogText!: Phaser.GameObjects.Text
   private chatInputText!: Phaser.GameObjects.Text
+  private chatInputRect!: Phaser.GameObjects.Rectangle
   private actionText!: Phaser.GameObjects.Text
   private settingsText!: Phaser.GameObjects.Text
   private hintText!: Phaser.GameObjects.Text
@@ -41,6 +44,8 @@ export class LobbyScene extends Phaser.Scene {
     roomCode?: string
     room?: Room<GameState>
     isPrivate?: boolean
+    maxPlayers?: number
+    gameMode?: string
   }) {
     this.typedName = data?.name ?? ""
     this.characterId = data?.characterId ?? "default"
@@ -48,6 +53,8 @@ export class LobbyScene extends Phaser.Scene {
     this.roomCode = data?.roomCode ?? ""
     this.preJoinedRoom = data?.room ?? null
     this.createIsPrivate = data?.isPrivate ?? false
+    this.createMaxPlayers = data?.maxPlayers ?? 2
+    this.createGameMode = data?.gameMode ?? "olympiade"
   }
 
   create() {
@@ -107,6 +114,14 @@ export class LobbyScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true })
 
     this.roomCodeText.on("pointerdown", () => this.copyRoomCode())
+    this.roomCodeText.on("pointerover", () => {
+      this.tweens.killTweensOf(this.roomCodeText)
+      this.tweens.add({ targets: this.roomCodeText, scaleX: 1.06, scaleY: 1.06, duration: 120, ease: "Back.easeOut" })
+    })
+    this.roomCodeText.on("pointerout", () => {
+      this.tweens.killTweensOf(this.roomCodeText)
+      this.tweens.add({ targets: this.roomCodeText, scaleX: 1.0, scaleY: 1.0, duration: 80, ease: "Power1" })
+    })
 
     // Player Panel
     UIFactory.createPanel(this, 170, 290, 300, 430)
@@ -133,7 +148,17 @@ export class LobbyScene extends Phaser.Scene {
     })
 
     // Chat input box
-    this.add.rectangle(570, 472, 340, 34, toHex(THEME.colors.black)).setStrokeStyle(1, toHex(THEME.colors.border))
+    this.chatInputRect = this.add.rectangle(570, 472, 340, 34, toHex(THEME.colors.black))
+      .setStrokeStyle(1, toHex(THEME.colors.border))
+      .setInteractive({ useHandCursor: true })
+    this.chatInputRect.on("pointerdown", () => {
+      if (this.inputMode !== "chat") {
+        this.inputMode = "chat"
+        this.typedChat = ""
+        this.refreshChatCursor()
+        this.refreshLobbyUI()
+      }
+    })
     this.chatInputText = this.add.text(410, 472, "", {
       fontFamily: THEME.fonts.body,
       fontSize: "15px",
@@ -238,6 +263,10 @@ export class LobbyScene extends Phaser.Scene {
     this.chatInputText?.setText(
       this.typedChat + (this.inputMode === "chat" ? (this.cursorVisible ? "|" : " ") : ""),
     )
+    this.chatInputRect?.setStrokeStyle(
+      1,
+      toHex(this.inputMode === "chat" ? THEME.colors.primary : THEME.colors.border)
+    )
   }
 
   private handleKeydown(event: KeyboardEvent) {
@@ -298,6 +327,9 @@ export class LobbyScene extends Phaser.Scene {
         this.room = this.preJoinedRoom
       } else if (this.joinMode === "create") {
         this.room = await createRoom(name, this.characterId, this.createIsPrivate)
+        if (this.createMaxPlayers !== 2 || this.createGameMode !== "olympiade") {
+          sendGamemasterSettings(this.createMaxPlayers, this.createGameMode)
+        }
       } else if (this.joinMode === "join") {
         this.room = await joinByCode(name, this.characterId, this.roomCode)
       } else {
