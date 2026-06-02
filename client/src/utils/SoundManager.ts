@@ -70,4 +70,36 @@ export const sounds = {
     beep(660, 0.08, "sine", 0.18)
     setTimeout(() => beep(880, 0.12, "sine", 0.18), 80)
   },
+
+  connect4Thunk(detune = 0) {
+    const c = getCtx()
+    const osc = c.createOscillator()
+    const g = c.createGain()
+    osc.connect(g)
+    g.connect(c.destination)
+    osc.type = "square"
+    osc.frequency.setValueAtTime(120 + detune * 0.5, c.currentTime)
+    g.gain.setValueAtTime(0.28, c.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.18)
+    osc.start(c.currentTime)
+    osc.stop(c.currentTime + 0.18)
+  },
+
+  pieceLand(detune = 0) {
+    const c = getCtx()
+    const osc = c.createOscillator()
+    const g = c.createGain()
+    osc.connect(g)
+    g.connect(c.destination)
+    osc.type = "triangle"
+    osc.frequency.setValueAtTime(300 + detune * 0.3, c.currentTime)
+    g.gain.setValueAtTime(0.14, c.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.1)
+    osc.start(c.currentTime)
+    osc.stop(c.currentTime + 0.1)
+  },
+
+  wheelTick() {
+    beep(900, 0.04, "triangle", 0.09)
+  },
 }
