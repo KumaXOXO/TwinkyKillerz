@@ -4,6 +4,9 @@ import type { GameState } from "@twinky/shared/schema"
 import { MINIGAMES, WHEEL_ARROW_INFLUENCE, WHEEL_BASE_DECEL, PHASER_NUM_KEYS } from "@twinky/shared/constants"
 import { computeSegmentWeights } from "@twinky/shared/wheelLogic"
 import { sendWheelDone, sendPlaceChip } from "../network/ColyseusClient"
+import { initJuice, type JuiceConfig } from "../juice/index"
+import { climax } from "../juice/climax"
+import { sounds } from "../utils/SoundManager"
 
 const RADIUS = 200
 const C = {
@@ -22,6 +25,8 @@ export class WheelScene extends Phaser.Scene {
   private decelMult = 1.0
   private isSpinning = false
   private isDone = false
+  private juice!: JuiceConfig
+  private lastTickTime = 0
   private stateChangeCallback: ((state: GameState) => void) | null = null
   private spaceHandler: (() => void) | null = null
   private placementTexts: Phaser.GameObjects.Text[] = []
@@ -50,6 +55,7 @@ export class WheelScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = initJuice()
     const { width, height } = this.scale
 
     this.add
@@ -159,6 +165,15 @@ export class WheelScene extends Phaser.Scene {
     this.velocity = Math.max(0, this.velocity - WHEEL_BASE_DECEL * this.decelMult * (delta / 1000))
     this.angle += this.velocity * (delta / 1000)
     this.wheelContainer.setAngle(this.angle)
+
+    if (this.isSpinning && !this.isDone && this.velocity > 0) {
+      const now = this.time.now
+      const interval = Math.max(60, 300 - this.velocity * 0.3)
+      if (now - this.lastTickTime > interval) {
+        this.lastTickTime = now
+        sounds.wheelTick()
+      }
+    }
 
     if (this.velocity <= 0) {
       this.isDone = true
@@ -381,7 +396,13 @@ export class WheelScene extends Phaser.Scene {
       duration: 300,
       ease: "Cubic.easeOut",
       onComplete: () => {
-        this.time.delayedCall(2000, () => sendWheelDone())
+        void climax(this.juice, this, {
+          hitstopMs: 60,
+          shake: { intensity: 0.006, ms: 180 },
+          pop: { x: this.wheelContainer.x, y: this.wheelContainer.y, color: 0xffd700, count: 20 },
+        }).then(() => {
+          this.time.delayedCall(1800, () => sendWheelDone())
+        })
       },
     })
   }
