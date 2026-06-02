@@ -10,7 +10,7 @@ const CARD_H = 90
 const GAP = 10
 const GRID_LEFT = (800 - COLS * CARD_W - (COLS - 1) * GAP) / 2
 const GRID_TOP = 240
-const VERSION = "v0.2.0"
+const VERSION = "v0.3.0"
 
 const C = {
   bg: 0x0d0d1a,
