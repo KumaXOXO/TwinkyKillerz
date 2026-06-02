@@ -5,6 +5,9 @@ import { CONNECT4_COLS, CONNECT4_ROWS, CHESS_PLAYER_COLORS } from "@twinky/share
 import { sendConnect4Drop } from "../network/ColyseusClient"
 import { sounds } from "../utils/SoundManager"
 import { CheatHUD } from "../utils/CheatHUD"
+import { initJuice, type JuiceConfig } from "../juice/index"
+import { punch } from "../juice/helpers"
+import { climax } from "../juice/climax"
 
 const CELL = 60
 const GRID_X = (800 - CONNECT4_COLS * CELL) / 2
@@ -27,6 +30,7 @@ export class Connect4Scene extends Phaser.Scene {
   private playerColors: Record<string, number> = {}
   private prevBoard: string[] = []
   private cheatHUD!: CheatHUD
+  private juice!: JuiceConfig
 
   constructor() {
     super({ key: "Connect4Scene" })
@@ -41,6 +45,7 @@ export class Connect4Scene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = initJuice()
     const { width, height } = this.scale
 
     this.add
@@ -103,9 +108,18 @@ export class Connect4Scene extends Phaser.Scene {
           this.room.onStateChange.remove(this.stateChangeCallback)
           this.stateChangeCallback = null
         }
-        sounds.roundWin()
-        this.time.delayedCall(2500, () => {
-          this.scene.start("ResultScene", { room: this.room })
+        const winnerId = state.connect4.winnerId
+        const winColor = winnerId ? (this.playerColors[winnerId] ?? 0xffffff) : 0xffffff
+        const boardCenterX = GRID_X + (CONNECT4_COLS * CELL) / 2
+        const boardCenterY = GRID_Y + (CONNECT4_ROWS * CELL) / 2
+        void climax(this.juice, this, {
+          hitstopMs: 80,
+          shake: { intensity: 0.008, ms: 220 },
+          pop: { x: boardCenterX, y: boardCenterY, color: winColor, count: 14 },
+        }).then(() => {
+          this.time.delayedCall(1800, () => {
+            this.scene.start("ResultScene", { room: this.room })
+          })
         })
       }
     }
@@ -192,6 +206,7 @@ export class Connect4Scene extends Phaser.Scene {
     const endY = GRID_Y + targetRow * CELL + CELL / 2
     const cx = GRID_X + col * CELL + CELL / 2
     const r = CELL / 2 - 4
+    const idx = targetRow * CONNECT4_COLS + col
 
     sounds.connect4Drop()
     const g = this.add.graphics()
@@ -205,7 +220,12 @@ export class Connect4Scene extends Phaser.Scene {
       y: endY,
       duration: 80 + targetRow * 35,
       ease: "Bounce.easeOut",
-      onComplete: () => g.destroy(),
+      onComplete: () => {
+        g.destroy()
+        sounds.connect4Thunk(targetRow * 8)
+        const cell = this.cellGraphics[idx]
+        if (cell?.active) punch(this.juice, cell, 1.15, 110)
+      },
     })
   }
 
