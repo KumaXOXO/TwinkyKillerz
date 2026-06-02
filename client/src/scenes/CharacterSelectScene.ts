@@ -5,13 +5,14 @@ import { joinByCode, getPublicLobbies, joinLobbyById, type LobbyInfo } from "../
 import { THEME, toHex } from "../utils/Theme"
 import { UIFactory } from "../utils/UIFactory"
 
-const COLS = 4
-const CARD_W = 160
-const CARD_H = 180
-const GAP = 20
+const COLS = 3
+const ROWS = 3
+const CARD_W = 180
+const CARD_H = 140
+const GAP = 15
 const GRID_LEFT = (800 - COLS * CARD_W - (COLS - 1) * GAP) / 2
-const GRID_TOP = 200
-const VERSION = "v0.5.0-ANIMATED"
+const GRID_TOP = 220
+const VERSION = "v0.5.0-BALATRO"
 
 export class CharacterSelectScene extends Phaser.Scene {
   private typedName = ""
@@ -40,8 +41,8 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   preload() {
-    // Load SpriteSheets
-    this.load.spritesheet('char_main', 'assets/Gemini_Generated_Image_qhrnp3qhrnp3qhrn.png', { frameWidth: 64, frameHeight: 64 });
+    // Attempting to match the sheet layout based on dimension check (1285x832)
+    this.load.spritesheet('char_main', 'assets/Gemini_Generated_Image_qhrnp3qhrnp3qhrn.png', { frameWidth: 128, frameHeight: 128 });
     this.load.spritesheet('char_robin', 'assets/Gemini_Generated_Image_m0w3i8m0w3i8m0w3.png', { frameWidth: 128, frameHeight: 128 });
     this.load.spritesheet('char_ingo', 'assets/Gemini_Generated_Image_5pmfmo5pmfmo5pmf.png', { frameWidth: 128, frameHeight: 128 });
   }
@@ -51,42 +52,58 @@ export class CharacterSelectScene extends Phaser.Scene {
     sounds.resume()
     this.cameras.main.setPostPipeline('CRTPipeline')
 
-    // Setup Animations
+    // Setup Animations (4 frames each)
     CHARACTERS.forEach((ch) => {
-      const row = ch.frameRow;
-      const start = row * 4;
-      const end = start + 3;
+      // Main sheet has multiple characters. Let's map their start frame.
+      // 1285 / 128 is ~10 frames per row.
+      let startFrame = 0;
+      if (ch.asset === 'char_main') {
+          // lucas: 0, fedor: 3 (rough guess), dodo: 6
+          // but if row 0 has 3 characters, maybe 4 frames each?
+          // Lucas: 0-3, Fedor: 4-7, Dodo: 8-11? (128*10 = 1280)
+          startFrame = ch.frameRow * 10;
+      } else if (ch.asset === 'char_ingo') {
+          startFrame = ch.frameRow * 10;
+      }
 
       this.anims.create({
         key: `anim_${ch.id}`,
-        frames: this.anims.generateFrameNumbers(ch.asset, { start, end }),
+        frames: this.anims.generateFrameNumbers(ch.asset, { start: startFrame, end: startFrame + 3 }),
         frameRate: 8,
         repeat: -1
       });
     });
 
-    UIFactory.createHeader(this, width / 2, 40, "IDENTITY SELECTION")
+    UIFactory.createHeader(this, width / 2, 40, "TWINKY GAMES")
 
     this.add
-      .text(width / 2, 80, "AUTHORIZED PERSONNEL ONLY", {
+      .text(width / 2, 88, "Choose your character", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "20px",
+        color: THEME.colors.muted
+      })
+      .setOrigin(0.5)
+
+    this.add
+      .text(width - 8, height - 8, VERSION, {
+        fontFamily: THEME.fonts.body,
+        fontSize: "12px",
+        color: THEME.colors.muted
+      })
+      .setOrigin(1, 1)
+
+    // Name input box
+    this.add
+      .text(width / 2, 148, "Your name:", {
         fontFamily: THEME.fonts.body,
         fontSize: "18px",
         color: THEME.colors.muted
       })
       .setOrigin(0.5)
 
-    // Name input box
-    this.add
-      .text(width / 2, 120, "SCANNING ID TAG...", {
-        fontFamily: THEME.fonts.body,
-        fontSize: "16px",
-        color: THEME.colors.muted
-      })
-      .setOrigin(0.5)
-
-    this.add.rectangle(width / 2, 155, 320, 44, toHex(THEME.colors.black)).setStrokeStyle(2, toHex(THEME.colors.border))
+    this.add.rectangle(width / 2, 178, 300, 44, toHex(THEME.colors.black)).setStrokeStyle(2, toHex(THEME.colors.border))
     this.nameText = this.add
-      .text(width / 2, 155, "", {
+      .text(width / 2, 178, "", {
         fontFamily: THEME.fonts.header,
         fontSize: "20px",
         color: THEME.colors.white
@@ -105,8 +122,10 @@ export class CharacterSelectScene extends Phaser.Scene {
         .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
 
-      const sprite = this.add.sprite(0, -20, ch.asset, ch.frameRow * 4).setScale(ch.asset === 'char_main' ? 2 : 1)
-      const name = this.add.text(0, 55, ch.name.toUpperCase(), {
+      const startFrame = (ch.asset === 'char_main' || ch.asset === 'char_ingo') ? ch.frameRow * 10 : 0;
+      const sprite = this.add.sprite(0, -10, ch.asset, startFrame).setScale(0.8)
+
+      const name = this.add.text(0, 50, ch.name.toUpperCase(), {
         fontFamily: THEME.fonts.header,
         fontSize: "10px",
         color: ch.color,
@@ -129,9 +148,9 @@ export class CharacterSelectScene extends Phaser.Scene {
         this.tweens.add({
           targets: container,
           scale: 1.1,
-          y: cy - 10,
+          y: cy - 5,
           duration: 150,
-          ease: 'Power2'
+          ease: 'Power1'
         })
         sprite.play(`anim_${ch.id}`)
       })
@@ -140,17 +159,17 @@ export class CharacterSelectScene extends Phaser.Scene {
         this.tweens.add({
           targets: container,
           scale: this.selectedIdx === i ? 1.05 : 1,
-          y: this.selectedIdx === i ? cy - 10 : cy,
+          y: this.selectedIdx === i ? cy - 5 : cy,
           duration: 150,
-          ease: 'Power2'
+          ease: 'Power1'
         })
         if (this.selectedIdx !== i) {
           sprite.stop()
-          sprite.setFrame(ch.frameRow * 4)
+          sprite.setFrame(startFrame)
         }
       })
 
-      // Random slow wobble
+      // Idle wobble
       this.tweens.add({
         targets: container,
         angle: { from: -0.5, to: 0.5 },
@@ -161,14 +180,22 @@ export class CharacterSelectScene extends Phaser.Scene {
       })
     })
 
-    const btnY = height - 60
-    this.createBtn = UIFactory.createButton(this, width / 2 - 130, btnY, 240, 48, "INITIALIZE ROOM", () => {
+    this.hintText = this.add
+      .text(width / 2, height - 30, "Arrows: choose character  |  ENTER: create room", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "14px",
+        color: THEME.colors.muted,
+      })
+      .setOrigin(0.5)
+
+    const btnY = height - 75
+    this.createBtn = UIFactory.createButton(this, width / 2 - 110, btnY, 200, 44, "CREATE ROOM", () => {
       if (!this.typedName.trim()) return
       sounds.menuConfirm()
       this.showCreateDialog()
     })
 
-    this.joinBtn = UIFactory.createButton(this, width / 2 + 130, btnY, 240, 48, "LINK VIA CODE", () => {
+    this.joinBtn = UIFactory.createButton(this, width / 2 + 110, btnY, 200, 44, "JOIN WITH CODE", () => {
       if (!this.typedName.trim()) return
       sounds.menuNav()
       this.showCodeInput()
@@ -213,12 +240,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       } else if (event.key === "Enter" && this.typedCode.trim().length >= 4) {
         sounds.menuConfirm()
         this.startWithCode()
-      } else if ((event.ctrlKey || event.metaKey) && event.key === "v") {
-        navigator.clipboard.readText().then(text => {
-          const cleaned = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6)
-          if (cleaned) { this.typedCode = cleaned; this.updateCodeDisplay() }
-        }).catch(() => {})
-      } else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && this.typedCode.length < 6) {
+      } else if (event.key.length === 1 && this.typedCode.length < 6) {
         this.typedCode += event.key.toUpperCase()
         this.updateCodeDisplay()
       }
@@ -265,6 +287,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       const container = this.cardContainers[i]
       const sprite = this.characterSprites[i]
       const ch = CHARACTERS[i]
+      const startFrame = (ch.asset === 'char_main' || ch.asset === 'char_ingo') ? ch.frameRow * 10 : 0;
 
       if (isSelected) {
         this.tweens.add({
@@ -282,7 +305,7 @@ export class CharacterSelectScene extends Phaser.Scene {
           ease: 'Power1'
         })
         sprite.stop()
-        sprite.setFrame(ch.frameRow * 4)
+        sprite.setFrame(startFrame)
       }
     })
   }
@@ -311,7 +334,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setDepth(10)
 
     const title = this.add
-      .text(width / 2, height / 2 - 210, "UPLINK REQUIRED", {
+      .text(width / 2, height / 2 - 210, "JOIN A LOBBY", {
         fontFamily: THEME.fonts.header,
         fontSize: "18px",
         color: THEME.colors.white
@@ -320,7 +343,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setDepth(11)
 
     const listTitle = this.add
-      .text(width / 2 - 170, height / 2 - 170, "AVAILABLE NODES", {
+      .text(width / 2 - 170, height / 2 - 170, "PUBLIC LOBBIES", {
         fontFamily: THEME.fonts.body,
         fontSize: "16px",
         color: THEME.colors.muted
@@ -334,7 +357,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setDepth(11)
 
     const codeTitle = this.add
-      .text(width / 2 + 170, height / 2 - 170, "OR INPUT SEQUENCE", {
+      .text(width / 2 + 170, height / 2 - 170, "OR ENTER CODE", {
         fontFamily: THEME.fonts.body,
         fontSize: "16px",
         color: THEME.colors.muted
@@ -361,30 +384,8 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(13)
 
-    const pasteBg = this.add
-      .rectangle(width / 2 + 170, height / 2 - 15, 100, 28, toHex(THEME.colors.panel))
-      .setStrokeStyle(1, toHex(THEME.colors.border))
-      .setInteractive({ useHandCursor: true })
-      .setDepth(12)
-    const pasteLbl = this.add
-      .text(width / 2 + 170, height / 2 - 15, "PASTE", {
-        fontFamily: THEME.fonts.header,
-        fontSize: "11px",
-        color: THEME.colors.muted
-      })
-      .setOrigin(0.5)
-      .setDepth(13)
-    pasteBg.on("pointerover", () => pasteBg.setFillStyle(0x1f1f3a))
-    pasteBg.on("pointerout", () => pasteBg.setFillStyle(toHex(THEME.colors.panel)))
-    pasteBg.on("pointerdown", () => {
-      navigator.clipboard.readText().then(text => {
-        const cleaned = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6)
-        if (cleaned) { this.typedCode = cleaned; this.updateCodeDisplay() }
-      }).catch(() => this.setCodeError("ACCESS DENIED"))
-    })
-
     const codeHint = this.add
-      .text(width / 2 + 170, height / 2 + 20, "EXECUTE TO CONNECT", {
+      .text(width / 2 + 170, height / 2 + 20, "ENTER to join code", {
         fontFamily: THEME.fonts.body,
         fontSize: "14px",
         color: THEME.colors.muted
@@ -404,7 +405,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setDepth(12)
 
     const closeHint = this.add
-      .text(width / 2, height / 2 + 210, "ESCAPE TO ABORT", {
+      .text(width / 2, height / 2 + 210, "ESC to close", {
         fontFamily: THEME.fonts.body,
         fontSize: "12px",
         color: THEME.colors.muted
@@ -414,15 +415,7 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     this.codeDisplayText = codeDisplay
     this.codeErrorText = errText
-    this.choiceGroup.push(overlay, title, listTitle, listBg, codeTitle, codeBg, codeInputBox, codeDisplay, pasteBg, pasteLbl, codeHint, errText, closeHint)
-
-    this.pasteListener = (e: ClipboardEvent) => {
-      if (this.joinPhase !== "codeInput") return
-      const cleaned = (e.clipboardData?.getData("text") ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6)
-      if (cleaned) { this.typedCode = cleaned; this.updateCodeDisplay() }
-      e.preventDefault()
-    }
-    window.addEventListener("paste", this.pasteListener)
+    this.choiceGroup.push(overlay, title, listTitle, listBg, codeTitle, codeBg, codeInputBox, codeDisplay, codeHint, errText, closeHint)
 
     this.refreshLobbyList()
     this.refreshTimer = this.time.addEvent({
@@ -448,7 +441,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     const startY = height / 2 - 140
     if (lobbies.length === 0) {
       const empty = this.add
-        .text(listX, height / 2 + 10, "NO ACTIVE NODES FOUND", {
+        .text(listX, height / 2 + 10, "No public lobbies yet.\nCreate one!", {
           fontFamily: THEME.fonts.body,
           fontSize: "15px",
           color: THEME.colors.muted,
@@ -479,7 +472,7 @@ export class CharacterSelectScene extends Phaser.Scene {
         .setStrokeStyle(1, isFull ? 0x553333 : toHex(THEME.colors.secondary))
         .setDepth(13)
       const joinLabel = this.add
-        .text(listX + 120, y, isFull ? "FULL" : "LINK", {
+        .text(listX + 120, y, isFull ? "FULL" : "JOIN", {
           fontFamily: THEME.fonts.header,
           fontSize: "10px",
           color: isFull ? "#aa5555" : THEME.colors.white,
@@ -500,7 +493,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     if (this.isConnecting) return
     this.isConnecting = true
     const ch = CHARACTERS[this.selectedIdx]
-    this.setCodeError("UPLINKING...")
+    this.setCodeError("Connecting...")
     try {
       const room = await joinLobbyById(this.typedName.trim(), ch?.id ?? "lucas", roomId)
       this.scene.start("LobbyScene", {
@@ -510,7 +503,7 @@ export class CharacterSelectScene extends Phaser.Scene {
         room,
       })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "LINK FAILED"
+      const msg = err instanceof Error ? err.message : "Join failed"
       this.setCodeError(msg)
       this.isConnecting = false
     }
@@ -563,7 +556,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setDepth(20)
 
     const title = this.add
-      .text(width / 2, height / 2 - 130, "SYSTEM INITIALIZATION", {
+      .text(width / 2, height / 2 - 130, "CREATE ROOM", {
         fontFamily: THEME.fonts.header,
         fontSize: "18px",
         color: THEME.colors.white
@@ -618,11 +611,11 @@ export class CharacterSelectScene extends Phaser.Scene {
       return [lbl, ...btns.map(b => b.bg), ...btns.map(b => b.txt)] as Phaser.GameObjects.GameObject[]
     }
 
-    const playerObjs = makeToggleRow("SLOTS", ["2", "3", "4"], height / 2 - 70,
+    const playerObjs = makeToggleRow("PLAYERS", ["2", "3", "4"], height / 2 - 70,
       () => String(dlgPlayers),
       v => { dlgPlayers = Number(v) }
     )
-    const modeObjs = makeToggleRow("PROTOCOL", ["OLYMPIADE", "SINGLE"], height / 2,
+    const modeObjs = makeToggleRow("MODE", ["OLYMPIADE", "SINGLE"], height / 2,
       () => dlgMode.toUpperCase(),
       v => { dlgMode = v.toLowerCase() }
     )
@@ -631,7 +624,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       v => { dlgPrivate = v === "PRIVATE" }
     )
 
-    const createBtnContainer = UIFactory.createButton(this, width / 2, height / 2 + 120, 240, 40, "INITIALIZE", () => {
+    const createBtnContainer = UIFactory.createButton(this, width / 2, height / 2 + 120, 200, 40, "CREATE", () => {
       sounds.menuConfirm()
       this.clearDialogGroup(group)
       this.joinPhase = "character"
@@ -639,7 +632,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     })
     createBtnContainer.setDepth(21)
 
-    const cancelHint = this.add.text(width / 2, height / 2 + 148, "ESCAPE TO ABORT", {
+    const cancelHint = this.add.text(width / 2, height / 2 + 148, "ESC to cancel", {
       fontFamily: THEME.fonts.body,
       fontSize: "12px",
       color: THEME.colors.muted
@@ -671,7 +664,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     if (this.isConnecting) return
     this.isConnecting = true
     const ch = CHARACTERS[this.selectedIdx]
-    this.setCodeError("UPLINKING...")
+    this.setCodeError("Connecting...")
     try {
       const room = await joinByCode(
         this.typedName.trim(),
@@ -685,7 +678,7 @@ export class CharacterSelectScene extends Phaser.Scene {
         room,
       })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "LINK FAILED"
+      const msg = err instanceof Error ? err.message : "Join failed"
       this.setCodeError(msg)
       this.typedCode = ""
       this.updateCodeDisplay()
