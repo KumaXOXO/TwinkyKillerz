@@ -64,7 +64,7 @@ export const CHESS_PAWN_DIRS: Record<ChessCorner, number> = {
   "bottom-left": -1, "bottom-right": -1, "top-right": 1, "top-left": 1,
 }
 
-export const CHESS_PLAYER_COLORS = ["#aa77ff", "#44ddff", "#ffaa44", "#44ff88"] as const
+export const CHESS_PLAYER_COLORS = ["#ff006e", "#3a86ff", "#ffbe0b", "#8338ec"] as const
 
 export const CHESS_PIECE_SYMBOLS: Record<string, string> = {
   king: "♔", queen: "♕", rook: "♖", bishop: "♗", knight: "♘", pawn: "♙",
@@ -73,13 +73,16 @@ export const CHESS_PIECE_SYMBOLS: Record<string, string> = {
 export const CHESS_TURN_MS = 30_000
 
 export const CHARACTERS = [
-  { id: "knight", name: "Knight", color: "#aa77ff", symbol: "♘" },
-  { id: "rook",   name: "Rook",   color: "#44ddff", symbol: "♖" },
-  { id: "bishop", name: "Bishop", color: "#ffaa44", symbol: "♗" },
-  { id: "queen",  name: "Queen",  color: "#44ff88", symbol: "♕" },
-  { id: "pawn",   name: "Pawn",   color: "#ff6688", symbol: "♙" },
-  { id: "king",   name: "King",   color: "#ffcc44", symbol: "♔" },
+  { id: "lucas", name: "Lucas", color: "#ff006e", asset: "char_main", frameRow: 0, symbol: "🧶" },
+  { id: "fedor", name: "Fedor", color: "#3a86ff", asset: "char_main", frameRow: 1, symbol: "🧠" },
+  { id: "dodo", name: "Dodo", color: "#ffffff", asset: "char_main", frameRow: 2, symbol: "⚡" },
+  { id: "christian", name: "Christian", color: "#8338ec", asset: "char_main", frameRow: 3, symbol: "🧔" },
+  { id: "grhost", name: "GR-Host", color: "#00f5d4", asset: "char_main", frameRow: 4, symbol: "🎧" },
+  { id: "robin", name: "Robin Reinhardt", color: "#ffbe0b", asset: "char_robin", frameRow: 0, symbol: "🏹" },
+  { id: "ingo_p", name: "Ingo P.", color: "#44ff88", asset: "char_ingo", frameRow: 0, symbol: "👮" },
+  { id: "ingo_p_f", name: "Ingo P. Female", color: "#ff6688", asset: "char_ingo", frameRow: 1, symbol: "👗" },
 ] as const
+
 export type CharacterId = (typeof CHARACTERS)[number]["id"]
 
 export const PHASER_NUM_KEYS = [
