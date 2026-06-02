@@ -2,13 +2,8 @@ import Phaser from "phaser"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 import { sendPlayerReady } from "../network/ColyseusClient"
-
-const C = {
-  text: "#e8d5ff",
-  muted: "#7070a0",
-  crown: "#ffcc44",
-  chip: "#44ff88",
-}
+import { THEME, toHex } from "../utils/Theme"
+import { UIFactory } from "../utils/UIFactory"
 
 export class ResultScene extends Phaser.Scene {
   private room!: Room<GameState>
@@ -25,60 +20,77 @@ export class ResultScene extends Phaser.Scene {
     const { width, height } = this.scale
     const round = this.room.state?.olympiade.currentRound ?? 0
 
-    this.add
-      .text(width / 2, 50, `Round ${round} Results`, {
-        fontSize: "28px",
-        color: C.text,
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5)
+    this.cameras.main.setPostPipeline('CRTPipeline')
+
+    UIFactory.createHeader(this, width / 2, 50, `ROUND ${round} RESULTS`)
 
     const sorted = this.room.state?.players
       ? [...this.room.state.players.values()].sort((a, b) => b.score - a.score)
       : []
 
-    let y = 110
+    let y = 130
     sorted.forEach((player, idx) => {
       const medal = idx === 0 ? "★ " : `${idx + 1}. `
-      const color = idx === 0 ? C.crown : C.text
+      const color = idx === 0 ? THEME.colors.warning : THEME.colors.white
       const delay = 300 + idx * 150
 
       const nameText = this.add
-        .text(width / 2 - 120, y, `${medal}${player.name}`, { fontSize: "18px", color })
+        .text(width / 2 - 120, y, `${medal}${player.name}`, {
+          fontFamily: THEME.fonts.header,
+          fontSize: "18px",
+          color
+        })
         .setAlpha(0)
+        .setShadow(2, 2, '#000', 0)
+
       const scoreText = this.add
-        .text(width / 2 + 40, y, `${player.score} pts`, { fontSize: "18px", color: C.muted })
+        .text(width / 2 + 60, y, `${player.score} PTS`, {
+          fontFamily: THEME.fonts.body,
+          fontSize: "20px",
+          color: THEME.colors.muted
+        })
         .setAlpha(0)
-      this.tweens.add({ targets: [nameText, scoreText], alpha: 1, delay, duration: 350 })
+
+      this.tweens.add({ targets: [nameText, scoreText], alpha: 1, x: '+=20', delay, duration: 350, ease: 'Back.easeOut' })
 
       if (player.chipsEarned > 0) {
         const chipText = this.add
-          .text(width / 2 + 120, y, `+${player.chipsEarned} chip${player.chipsEarned !== 1 ? "s" : ""}`, {
-            fontSize: "14px",
-            color: C.chip,
+          .text(width / 2 + 160, y, `+${player.chipsEarned} CHIP${player.chipsEarned !== 1 ? "S" : ""}`, {
+            fontFamily: THEME.fonts.body,
+            fontSize: "16px",
+            color: THEME.colors.success,
           })
           .setAlpha(0)
-        this.tweens.add({ targets: chipText, alpha: 1, delay: delay + 120, duration: 300 })
+        this.tweens.add({ targets: chipText, alpha: 1, scale: { from: 0, to: 1 }, delay: delay + 120, duration: 300 })
       }
-      y += 34
+      y += 40
     })
 
     // Cheat log for this round
     const cheatEvents = [...this.room.state.cheatLog]
     if (cheatEvents.length > 0) {
-      this.add.text(width / 2, y + 8, "CHEAT LOG", { fontSize: "11px", color: C.muted }).setOrigin(0.5)
-      let cy = y + 24
+      this.add.text(width / 2, y + 20, "SECURITY LOG", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "12px",
+        color: THEME.colors.primary
+      }).setOrigin(0.5)
+
+      let cy = y + 45
       cheatEvents.slice(-4).forEach((ev, i) => {
         if (!ev) return
         const name = this.room.state.players.get(ev.playerId)?.name ?? "?"
-        const line = ev.caught ? `${name} CAUGHT cheating ✗` : `${name} cheated successfully ✓`
-        const color = ev.caught ? "#ff6060" : "#44ff88"
+        const line = ev.caught ? `${name} CAUGHT CHEATING ✗` : `${name} TERMINATED SUCCESSFULLY ✓`
+        const color = ev.caught ? "#ff6060" : THEME.colors.success
         this.add
-          .text(width / 2, cy, line, { fontSize: "12px", color })
+          .text(width / 2, cy, line, {
+            fontFamily: THEME.fonts.body,
+            fontSize: "14px",
+            color
+          })
           .setOrigin(0.5)
           .setAlpha(0)
           .setData("delay", 600 + i * 100)
-        cy += 18
+        cy += 20
       })
       // Tween them in
       this.children.list
@@ -90,7 +102,11 @@ export class ResultScene extends Phaser.Scene {
     }
 
     this.add
-      .text(width / 2, height - 60, "Press SPACE to continue", { fontSize: "14px", color: C.muted })
+      .text(width / 2, height - 60, "PRESS [SPACE] TO CONTINUE", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "14px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
 
     this.input.keyboard?.once("keydown-SPACE", () => sendPlayerReady())
@@ -116,9 +132,15 @@ export class ResultScene extends Phaser.Scene {
 
   private showGameOver() {
     const { width, height } = this.scale
-    this.add.rectangle(width / 2, height / 2, 500, 80, 0x0d0d1a).setStrokeStyle(2, 0xff6060)
+    this.add.rectangle(width / 2, height / 2, 500, 100, toHex(THEME.colors.bg), 0.9).setStrokeStyle(2, toHex(THEME.colors.primary))
     this.add
-      .text(width / 2, height / 2, "GAME OVER", { fontSize: "32px", color: "#ff6060", fontStyle: "bold" })
+      .text(width / 2, height / 2, "SYSTEM TERMINATED", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "32px",
+        color: THEME.colors.primary,
+        fontStyle: "bold"
+      })
       .setOrigin(0.5)
+      .setShadow(0, 0, THEME.colors.primary, 10, true, true)
   }
 }

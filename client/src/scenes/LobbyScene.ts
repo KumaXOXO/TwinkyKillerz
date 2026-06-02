@@ -4,15 +4,8 @@ import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 import { CHARACTERS } from "@twinky/shared/constants"
 import { sounds } from "../utils/SoundManager"
-
-const C = {
-  panel: 0x16162a,
-  border: 0x3a2a6e,
-  text: "#e8d5ff",
-  muted: "#7070a0",
-  ready: "#44ff88",
-  crown: "#ffcc44",
-}
+import { THEME, toHex } from "../utils/Theme"
+import { UIFactory } from "../utils/UIFactory"
 
 export class LobbyScene extends Phaser.Scene {
   private room: Room<GameState> | null = null
@@ -33,7 +26,7 @@ export class LobbyScene extends Phaser.Scene {
   private actionText!: Phaser.GameObjects.Text
   private settingsText!: Phaser.GameObjects.Text
   private hintText!: Phaser.GameObjects.Text
-  private actionBtn!: Phaser.GameObjects.Rectangle
+  private actionBtn!: Phaser.GameObjects.Container
   private playerEntries: Phaser.GameObjects.Text[] = []
   private stateChangeCallback: ((state: GameState) => void) | null = null
 
@@ -60,6 +53,7 @@ export class LobbyScene extends Phaser.Scene {
   create() {
     this.doJoin(this.typedName)
     this.input.keyboard!.on("keydown", this.handleKeydown, this)
+    this.cameras.main.setPostPipeline('CRTPipeline')
   }
 
   update(_time: number, delta: number) {
@@ -100,53 +94,70 @@ export class LobbyScene extends Phaser.Scene {
 
   private buildLobbyScreen() {
     const { width } = this.scale
-    this.add.text(20, 16, "TWINKY GAMES", { fontSize: "20px", color: C.text, fontStyle: "bold" })
+
+    UIFactory.createHeader(this, width / 2, 40, "LOBBY")
+
     this.roomCodeText = this.add
-      .text(width - 20, 16, "", { fontSize: "20px", color: C.crown })
+      .text(width - 20, 16, "", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "18px",
+        color: THEME.colors.warning
+      })
       .setOrigin(1, 0)
       .setInteractive({ useHandCursor: true })
-    this.roomCodeText.on("pointerover", () => {
-      this.tweens.add({
-        targets: this.roomCodeText,
-        scale: 1.15,
-        duration: 120,
-        ease: "Sine.easeOut",
-      })
-    })
-    this.roomCodeText.on("pointerout", () => {
-      this.tweens.add({
-        targets: this.roomCodeText,
-        scale: 1.0,
-        duration: 120,
-        ease: "Sine.easeOut",
-      })
-    })
+
     this.roomCodeText.on("pointerdown", () => this.copyRoomCode())
-    this.add.rectangle(170, 290, 300, 430, C.panel).setStrokeStyle(1, C.border)
-    this.add.text(170, 65, "PLAYERS", { fontSize: "12px", color: C.muted }).setOrigin(0.5)
-    this.add.rectangle(570, 270, 340, 390, C.panel).setStrokeStyle(1, C.border)
-    this.add.text(570, 65, "CHAT", { fontSize: "12px", color: C.muted }).setOrigin(0.5)
-    this.chatLogText = this.add.text(405, 82, "", {
+
+    // Player Panel
+    UIFactory.createPanel(this, 170, 290, 300, 430)
+    this.add.text(170, 85, "PLAYERS", {
+      fontFamily: THEME.fonts.header,
       fontSize: "12px",
-      color: C.muted,
+      color: THEME.colors.muted
+    }).setOrigin(0.5)
+
+    // Chat Panel
+    UIFactory.createPanel(this, 570, 270, 340, 390)
+    this.add.text(570, 85, "DATA STREAM", {
+      fontFamily: THEME.fonts.header,
+      fontSize: "12px",
+      color: THEME.colors.muted
+    }).setOrigin(0.5)
+
+    this.chatLogText = this.add.text(405, 105, "", {
+      fontFamily: THEME.fonts.body,
+      fontSize: "14px",
+      color: THEME.colors.text,
       wordWrap: { width: 320 },
       lineSpacing: 3,
     })
-    this.add.rectangle(570, 472, 340, 34, 0x0a0a16).setStrokeStyle(1, C.border)
-    this.chatInputText = this.add.text(410, 472, "", { fontSize: "13px", color: C.text }).setOrigin(0, 0.5)
+
+    // Chat input box
+    this.add.rectangle(570, 472, 340, 34, toHex(THEME.colors.black)).setStrokeStyle(1, toHex(THEME.colors.border))
+    this.chatInputText = this.add.text(410, 472, "", {
+      fontFamily: THEME.fonts.body,
+      fontSize: "15px",
+      color: THEME.colors.white
+    }).setOrigin(0, 0.5)
+
     this.settingsText = this.add
-      .text(width / 2, 520, "", { fontSize: "13px", color: C.muted, align: "center" })
+      .text(width / 2, 520, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "14px",
+        color: THEME.colors.muted,
+        align: "center"
+      })
       .setOrigin(0.5)
-    this.actionBtn = this.add
-      .rectangle(width / 2, 554, 240, 40, C.border)
-      .setInteractive({ useHandCursor: true })
-    this.actionBtn.on("pointerover", () => this.actionBtn.setFillStyle(0x2a1a4e))
-    this.actionBtn.on("pointerout", () => this.actionBtn.setFillStyle(C.border))
-    this.actionBtn.on("pointerdown", () => sendPlayerReady())
-    this.actionText = this.add
-      .text(width / 2, 554, "", { fontSize: "18px", color: "#aa77ff", fontStyle: "bold" })
-      .setOrigin(0.5)
-    this.hintText = this.add.text(width / 2, 584, "", { fontSize: "11px", color: C.muted }).setOrigin(0.5)
+
+    this.actionBtn = UIFactory.createButton(this, width / 2, 554, 300, 44, "READY (SPACE)", () => sendPlayerReady())
+    this.actionText = (this.actionBtn.list[1] as Phaser.GameObjects.Text)
+
+    this.hintText = this.add.text(width / 2, 588, "", {
+      fontFamily: THEME.fonts.body,
+      fontSize: "12px",
+      color: THEME.colors.muted
+    }).setOrigin(0.5)
+
     this.refreshLobbyUI()
   }
 
@@ -159,7 +170,7 @@ export class LobbyScene extends Phaser.Scene {
 
     this.playerEntries.forEach(t => t.destroy())
     this.playerEntries = []
-    let py = 82
+    let py = 110
     state.players.forEach((p, id) => {
       const ch = CHARACTERS.find(c => c.id === p.characterId)
       const symbol = ch?.symbol ?? "?"
@@ -170,21 +181,22 @@ export class LobbyScene extends Phaser.Scene {
       const meIsGM = state.players.get(this.room?.sessionId ?? "")?.isGamemaster ?? false
       const canTransfer = meIsGM && !p.isGamemaster
 
-      const t = this.add.text(30, py, label, {
-        fontSize: "16px",
-        color: isMe ? C.text : C.muted,
+      const t = this.add.text(35, py, label, {
+        fontFamily: THEME.fonts.body,
+        fontSize: "18px",
+        color: isMe ? THEME.colors.primary : THEME.colors.text,
       })
       if (canTransfer) {
         t.setInteractive({ useHandCursor: true })
-        t.on("pointerover", () => t.setColor(C.crown))
-        t.on("pointerout", () => t.setColor(isMe ? C.text : C.muted))
+        t.on("pointerover", () => t.setColor(THEME.colors.warning))
+        t.on("pointerout", () => t.setColor(isMe ? THEME.colors.primary : THEME.colors.text))
         t.on("pointerdown", () => {
           sounds.menuConfirm()
           sendTransferGamemaster(id)
         })
       }
       this.playerEntries.push(t)
-      py += 26
+      py += 28
     })
 
     const chatLines = [...state.chatMessages]
@@ -195,11 +207,11 @@ export class LobbyScene extends Phaser.Scene {
     const visibility = state.isPrivate ? "PRIVATE" : "PUBLIC"
     if (me?.isGamemaster) {
       this.settingsText?.setText(
-        `[←/→] players: ${state.maxPlayers}   [M] mode: ${(state.gameMode ?? "olympiade").toUpperCase()}   ${visibility}`
+        `[←/→] PLAYERS: ${state.maxPlayers}   [M] MODE: ${(state.gameMode ?? "olympiade").toUpperCase()}   ${visibility}`
       )
     } else {
       this.settingsText?.setText(
-        `Mode: ${(state.gameMode ?? "olympiade").toUpperCase()}   Players: ${state.maxPlayers}   ${visibility}`
+        `MODE: ${(state.gameMode ?? "olympiade").toUpperCase()}   PLAYERS: ${state.maxPlayers}   ${visibility}`
       )
     }
 
@@ -207,11 +219,11 @@ export class LobbyScene extends Phaser.Scene {
     const allReady = connected.length >= 2 && connected.every((p) => p.isReady)
 
     if (me?.isGamemaster && allReady) {
-      this.actionText?.setText("SPACE — START GAME").setStyle({ color: C.ready })
+      this.actionText?.setText("SPACE — START GAME").setStyle({ color: THEME.colors.success })
     } else if (me?.isReady) {
-      this.actionText?.setText("READY — WAITING FOR OTHERS").setStyle({ color: C.muted })
+      this.actionText?.setText("WAITING FOR OTHERS...").setStyle({ color: THEME.colors.muted })
     } else {
-      this.actionText?.setText("SPACE — READY").setStyle({ color: "#aa77ff" })
+      this.actionText?.setText("SPACE — READY").setStyle({ color: THEME.colors.primary })
     }
 
     this.hintText?.setText(
@@ -300,7 +312,7 @@ export class LobbyScene extends Phaser.Scene {
       const cx = this.scale.width / 2
       const cy = this.scale.height / 2
       this.add.text(cx, cy, msg, { fontSize: "16px", color: "#ff5555" }).setOrigin(0.5)
-      this.add.text(cx, cy + 36, "Press ENTER to go back", { fontSize: "13px", color: C.muted }).setOrigin(0.5)
+      this.add.text(cx, cy + 36, "Press ENTER to go back", { fontSize: "13px", color: THEME.colors.muted }).setOrigin(0.5)
     }
   }
 

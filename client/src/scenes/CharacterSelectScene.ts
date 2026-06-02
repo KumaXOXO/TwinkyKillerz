@@ -2,24 +2,17 @@ import Phaser from "phaser"
 import { CHARACTERS } from "@twinky/shared/constants"
 import { sounds } from "../utils/SoundManager"
 import { joinByCode, getPublicLobbies, joinLobbyById, type LobbyInfo } from "../network/ColyseusClient"
+import { THEME, toHex } from "../utils/Theme"
+import { UIFactory } from "../utils/UIFactory"
 
 const COLS = 3
 const ROWS = 2
 const CARD_W = 180
-const CARD_H = 90
-const GAP = 10
+const CARD_H = 110
+const GAP = 15
 const GRID_LEFT = (800 - COLS * CARD_W - (COLS - 1) * GAP) / 2
-const GRID_TOP = 240
-const VERSION = "v0.4.0"
-
-const C = {
-  bg: 0x0d0d1a,
-  panel: 0x16162a,
-  border: 0x3a2a6e,
-  selected: 0x6633cc,
-  text: "#e8d5ff",
-  muted: "#7070a0",
-}
+const GRID_TOP = 220
+const VERSION = "v0.4.0-BALATRO"
 
 export class CharacterSelectScene extends Phaser.Scene {
   private typedName = ""
@@ -28,8 +21,8 @@ export class CharacterSelectScene extends Phaser.Scene {
   private cursorTimer = 0
   private nameText!: Phaser.GameObjects.Text
   private hintText!: Phaser.GameObjects.Text
-  private cards: Phaser.GameObjects.Rectangle[] = []
-  private cardBorders: Phaser.GameObjects.Rectangle[] = []
+  private cardContainers: Phaser.GameObjects.Container[] = []
+  private cardBgs: Phaser.GameObjects.Rectangle[] = []
   private joinPhase: "character" | "codeInput" = "character"
   private isConnecting = false
   private typedCode = ""
@@ -37,14 +30,12 @@ export class CharacterSelectScene extends Phaser.Scene {
   private codeDisplayText?: Phaser.GameObjects.Text
   private codeErrorText?: Phaser.GameObjects.Text
   private isPrivate = false
-  private privateBtn?: Phaser.GameObjects.Rectangle
+  private privateBtn?: Phaser.GameObjects.Container
   private privateBtnLabel?: Phaser.GameObjects.Text
   private lobbyRows: Phaser.GameObjects.GameObject[] = []
   private refreshTimer?: Phaser.Time.TimerEvent
-  private createBtn!: Phaser.GameObjects.Rectangle
-  private createBtnLabel!: Phaser.GameObjects.Text
-  private joinBtn!: Phaser.GameObjects.Rectangle
-  private joinBtnLabel!: Phaser.GameObjects.Text
+  private createBtn!: Phaser.GameObjects.Container
+  private joinBtn!: Phaser.GameObjects.Container
 
   constructor() {
     super({ key: "CharacterSelectScene" })
@@ -53,25 +44,42 @@ export class CharacterSelectScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale
     sounds.resume()
+    this.cameras.main.setPostPipeline('CRTPipeline')
+
+    UIFactory.createHeader(this, width / 2, 40, "TWINKY GAMES")
 
     this.add
-      .text(width / 2, 40, "TWINKY GAMES", { fontSize: "38px", color: C.text, fontStyle: "bold" })
-      .setOrigin(0.5)
-    this.add
-      .text(width / 2, 88, "Choose your character", { fontSize: "16px", color: C.muted })
+      .text(width / 2, 88, "Choose your character", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "20px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
 
     this.add
-      .text(width - 8, height - 8, VERSION, { fontSize: "11px", color: C.muted })
+      .text(width - 8, height - 8, VERSION, {
+        fontFamily: THEME.fonts.body,
+        fontSize: "12px",
+        color: THEME.colors.muted
+      })
       .setOrigin(1, 1)
 
     // Name input box
     this.add
-      .text(width / 2, 148, "Your name:", { fontSize: "15px", color: C.muted })
+      .text(width / 2, 140, "Your name:", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "18px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
-    this.add.rectangle(width / 2, 178, 280, 40, C.panel).setStrokeStyle(2, C.border)
+
+    this.add.rectangle(width / 2, 178, 300, 44, toHex(THEME.colors.black)).setStrokeStyle(2, toHex(THEME.colors.border))
     this.nameText = this.add
-      .text(width / 2, 178, "", { fontSize: "20px", color: C.text })
+      .text(width / 2, 178, "", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "20px",
+        color: THEME.colors.white
+      })
       .setOrigin(0.5)
 
     // Character grid
@@ -81,77 +89,96 @@ export class CharacterSelectScene extends Phaser.Scene {
       const cx = GRID_LEFT + col * (CARD_W + GAP) + CARD_W / 2
       const cy = GRID_TOP + row * (CARD_H + GAP) + CARD_H / 2
 
-      const border = this.add
-        .rectangle(cx, cy, CARD_W, CARD_H, C.panel)
-        .setStrokeStyle(2, C.border)
+      const container = this.add.container(cx, cy)
+      const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, toHex(THEME.colors.panel))
+        .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
-      const card = this.add.rectangle(cx, cy, CARD_W - 4, CARD_H - 4, C.panel)
-      this.cardBorders.push(border)
-      this.cards.push(card)
 
-      border.on("pointerdown", () => {
+      const symbol = this.add.text(0, -22, ch.symbol, { fontSize: "32px", color: ch.color }).setOrigin(0.5)
+      const name = this.add.text(0, 22, ch.name, {
+        fontFamily: THEME.fonts.header,
+        fontSize: "12px",
+        color: ch.color
+      }).setOrigin(0.5)
+
+      container.add([bg, symbol, name])
+      this.cardContainers.push(container)
+      this.cardBgs.push(bg)
+
+      bg.on("pointerdown", () => {
         this.selectedIdx = i
         sounds.menuNav()
         this.refreshSelection()
       })
 
-      this.add.text(cx, cy - 18, ch.symbol, { fontSize: "28px", color: ch.color }).setOrigin(0.5)
-      this.add.text(cx, cy + 18, ch.name, { fontSize: "13px", color: ch.color }).setOrigin(0.5)
+      bg.on("pointerover", () => {
+        this.tweens.add({
+          targets: container,
+          scale: 1.1,
+          y: cy - 5,
+          duration: 150,
+          ease: 'Power1'
+        })
+      })
+
+      bg.on("pointerout", () => {
+        this.tweens.add({
+          targets: container,
+          scale: this.selectedIdx === i ? 1.05 : 1,
+          y: this.selectedIdx === i ? cy - 5 : cy,
+          duration: 150,
+          ease: 'Power1'
+        })
+      })
+
+      // Idle wobble for all
+      this.tweens.add({
+        targets: container,
+        angle: { from: -1, to: 1 },
+        duration: 2000 + Math.random() * 1000,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        loop: -1
+      })
     })
 
     this.hintText = this.add
-      .text(width / 2, height - 30, "Arrows: choose character  |  ENTER: create room", {
-        fontSize: "13px",
-        color: C.muted,
+      .text(width / 2, height - 25, "Arrows: choose character  |  ENTER: create room", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "14px",
+        color: THEME.colors.muted,
       })
       .setOrigin(0.5)
 
-    const btnY = height - 62
-    this.createBtn = this.add
-      .rectangle(width / 2 - 110, btnY, 190, 44, C.border)
-      .setInteractive({ useHandCursor: true })
-    this.createBtnLabel = this.add
-      .text(width / 2 - 110, btnY, "CREATE ROOM", { fontSize: "14px", color: C.text })
-      .setOrigin(0.5)
-    this.joinBtn = this.add
-      .rectangle(width / 2 + 110, btnY, 190, 44, C.border)
-      .setInteractive({ useHandCursor: true })
-    this.joinBtnLabel = this.add
-      .text(width / 2 + 110, btnY, "JOIN WITH CODE", { fontSize: "14px", color: C.text })
-      .setOrigin(0.5)
-
-    this.createBtn.on("pointerover", () => {
-      if (this.typedName.trim()) this.createBtn.setFillStyle(C.selected)
-    })
-    this.createBtn.on("pointerout", () => this.createBtn.setFillStyle(C.border))
-    this.createBtn.on("pointerdown", () => {
+    const btnY = height - 70
+    this.createBtn = UIFactory.createButton(this, width / 2 - 120, btnY, 220, 48, "CREATE ROOM", () => {
       if (!this.typedName.trim()) return
       sounds.menuConfirm()
       this.startCreate()
     })
-    this.joinBtn.on("pointerover", () => {
-      if (this.typedName.trim()) this.joinBtn.setFillStyle(C.selected)
-    })
-    this.joinBtn.on("pointerout", () => this.joinBtn.setFillStyle(C.border))
-    this.joinBtn.on("pointerdown", () => {
+
+    this.joinBtn = UIFactory.createButton(this, width / 2 + 120, btnY, 220, 48, "JOIN WITH CODE", () => {
       if (!this.typedName.trim()) return
       sounds.menuNav()
       this.showCodeInput()
     })
 
-    this.privateBtn = this.add
-      .rectangle(width / 2, btnY + 50, 220, 32, C.panel)
-      .setStrokeStyle(2, C.border)
-      .setInteractive({ useHandCursor: true })
-    this.privateBtnLabel = this.add
-      .text(width / 2, btnY + 50, "PRIVATE LOBBY: OFF", { fontSize: "12px", color: C.muted })
-      .setOrigin(0.5)
-    this.privateBtn.on("pointerover", () => this.privateBtn?.setFillStyle(0x1f1f3a))
-    this.privateBtn.on("pointerout", () => this.privateBtn?.setFillStyle(C.panel))
-    this.privateBtn.on("pointerdown", () => {
+    const privY = btnY + 45
+    this.privateBtn = this.add.container(width / 2, privY)
+    const privBg = this.add.rectangle(0, 0, 240, 32, toHex(THEME.colors.panel)).setStrokeStyle(2, toHex(THEME.colors.border)).setInteractive({ useHandCursor: true })
+    this.privateBtnLabel = this.add.text(0, 0, "PRIVATE LOBBY: OFF", {
+      fontFamily: THEME.fonts.body,
+      fontSize: "14px",
+      color: THEME.colors.muted
+    }).setOrigin(0.5)
+    this.privateBtn.add([privBg, this.privateBtnLabel])
+
+    privBg.on("pointerover", () => privBg.setFillStyle(0x1f1f3a))
+    privBg.on("pointerout", () => privBg.setFillStyle(toHex(THEME.colors.panel)))
+    privBg.on("pointerdown", () => {
       this.isPrivate = !this.isPrivate
       this.privateBtnLabel?.setText(`PRIVATE LOBBY: ${this.isPrivate ? "ON" : "OFF"}`)
-      this.privateBtnLabel?.setColor(this.isPrivate ? C.text : C.muted)
+      this.privateBtnLabel?.setColor(this.isPrivate ? THEME.colors.text : THEME.colors.muted)
       sounds.menuNav()
     })
 
@@ -226,12 +253,27 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   private refreshSelection() {
-    this.cardBorders.forEach((b, i) => {
-      const color = i === this.selectedIdx ? C.selected : C.border
-      b.setStrokeStyle(2, color)
-    })
-    this.cards.forEach((c, i) => {
-      c.setFillStyle(i === this.selectedIdx ? C.selected : C.panel)
+    this.cardBgs.forEach((b, i) => {
+      const isSelected = i === this.selectedIdx
+      b.setStrokeStyle(2, isSelected ? toHex(THEME.colors.primary) : toHex(THEME.colors.border))
+      b.setFillStyle(isSelected ? 0x2a1a4e : toHex(THEME.colors.panel))
+
+      const container = this.cardContainers[i]
+      if (isSelected) {
+        this.tweens.add({
+          targets: container,
+          scale: 1.05,
+          duration: 200,
+          ease: 'Back.easeOut'
+        })
+      } else {
+        this.tweens.add({
+          targets: container,
+          scale: 1.0,
+          duration: 200,
+          ease: 'Power1'
+        })
+      }
     })
   }
 
@@ -243,10 +285,8 @@ export class CharacterSelectScene extends Phaser.Scene {
   private refreshButtons() {
     const hasName = this.typedName.trim().length > 0
     const alpha = hasName ? 1 : 0.4
-    this.createBtn?.setAlpha(alpha).setFillStyle(C.border)
-    this.createBtnLabel?.setAlpha(alpha)
-    this.joinBtn?.setAlpha(alpha).setFillStyle(C.border)
-    this.joinBtnLabel?.setAlpha(alpha)
+    this.createBtn?.setAlpha(alpha)
+    this.joinBtn?.setAlpha(alpha)
   }
 
   private showCodeInput() {
@@ -256,50 +296,87 @@ export class CharacterSelectScene extends Phaser.Scene {
     const { width, height } = this.scale
 
     const overlay = this.add
-      .rectangle(width / 2, height / 2, 720, 460, 0x0d0d1a)
-      .setStrokeStyle(2, C.border)
+      .rectangle(width / 2, height / 2, 720, 460, toHex(THEME.colors.bg), 0.95)
+      .setStrokeStyle(2, toHex(THEME.colors.border))
       .setDepth(10)
+
     const title = this.add
-      .text(width / 2, height / 2 - 210, "JOIN A LOBBY", { fontSize: "18px", color: C.text, fontStyle: "bold" })
+      .text(width / 2, height / 2 - 210, "JOIN A LOBBY", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "18px",
+        color: THEME.colors.white
+      })
       .setOrigin(0.5)
       .setDepth(11)
 
     const listTitle = this.add
-      .text(width / 2 - 170, height / 2 - 170, "PUBLIC LOBBIES", { fontSize: "13px", color: C.muted })
+      .text(width / 2 - 170, height / 2 - 170, "PUBLIC LOBBIES", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "16px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
       .setDepth(11)
+
     const listBg = this.add
-      .rectangle(width / 2 - 170, height / 2 + 10, 320, 340, C.panel)
-      .setStrokeStyle(1, C.border)
+      .rectangle(width / 2 - 170, height / 2 + 10, 320, 340, toHex(THEME.colors.panel))
+      .setStrokeStyle(1, toHex(THEME.colors.border))
       .setDepth(11)
 
     const codeTitle = this.add
-      .text(width / 2 + 170, height / 2 - 170, "OR ENTER CODE", { fontSize: "13px", color: C.muted })
+      .text(width / 2 + 170, height / 2 - 170, "OR ENTER CODE", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "16px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
       .setDepth(11)
+
     const codeBg = this.add
-      .rectangle(width / 2 + 170, height / 2 + 10, 320, 340, C.panel)
-      .setStrokeStyle(1, C.border)
+      .rectangle(width / 2 + 170, height / 2 + 10, 320, 340, toHex(THEME.colors.panel))
+      .setStrokeStyle(1, toHex(THEME.colors.border))
       .setDepth(11)
+
     const codeInputBox = this.add
-      .rectangle(width / 2 + 170, height / 2 - 60, 240, 44, 0x0a0a16)
-      .setStrokeStyle(2, C.border)
+      .rectangle(width / 2 + 170, height / 2 - 60, 240, 44, toHex(THEME.colors.black))
+      .setStrokeStyle(2, toHex(THEME.colors.border))
       .setDepth(12)
+
     const codeDisplay = this.add
-      .text(width / 2 + 170, height / 2 - 60, "", { fontSize: "22px", color: C.text, fontStyle: "bold" })
+      .text(width / 2 + 170, height / 2 - 60, "", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "22px",
+        color: THEME.colors.white
+      })
       .setOrigin(0.5)
       .setDepth(13)
+
     const codeHint = this.add
-      .text(width / 2 + 170, height / 2 + 10, "ENTER to join code", { fontSize: "12px", color: C.muted })
+      .text(width / 2 + 170, height / 2 + 10, "ENTER to join code", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "14px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
       .setDepth(12)
+
     const errText = this.add
-      .text(width / 2 + 170, height / 2 + 110, "", { fontSize: "13px", color: "#ff5555", wordWrap: { width: 280 }, align: "center" })
+      .text(width / 2 + 170, height / 2 + 110, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "15px",
+        color: "#ff5555",
+        wordWrap: { width: 280 },
+        align: "center"
+      })
       .setOrigin(0.5)
       .setDepth(12)
 
     const closeHint = this.add
-      .text(width / 2, height / 2 + 210, "ESC to close", { fontSize: "11px", color: C.muted })
+      .text(width / 2, height / 2 + 210, "ESC to close", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "12px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
       .setDepth(11)
 
@@ -331,7 +408,12 @@ export class CharacterSelectScene extends Phaser.Scene {
     const startY = height / 2 - 140
     if (lobbies.length === 0) {
       const empty = this.add
-        .text(listX, height / 2 + 10, "No public lobbies yet.\nCreate one!", { fontSize: "13px", color: C.muted, align: "center" })
+        .text(listX, height / 2 + 10, "No public lobbies yet.\nCreate one!", {
+          fontFamily: THEME.fonts.body,
+          fontSize: "15px",
+          color: THEME.colors.muted,
+          align: "center"
+        })
         .setOrigin(0.5)
         .setDepth(12)
       this.lobbyRows.push(empty)
@@ -341,32 +423,33 @@ export class CharacterSelectScene extends Phaser.Scene {
       const y = startY + idx * 38
       const isFull = lobby.playerCount >= lobby.maxPlayers
       const rowBg = this.add
-        .rectangle(listX, y, 300, 32, 0x0a0a16)
-        .setStrokeStyle(1, C.border)
+        .rectangle(listX, y, 300, 32, toHex(THEME.colors.black))
+        .setStrokeStyle(1, toHex(THEME.colors.border))
         .setDepth(12)
       const label = this.add
         .text(listX - 140, y, `${lobby.roomCode}  ${lobby.playerCount}/${lobby.maxPlayers}`, {
-          fontSize: "13px",
-          color: isFull ? "#ff5555" : C.text,
+          fontFamily: THEME.fonts.body,
+          fontSize: "14px",
+          color: isFull ? "#ff5555" : THEME.colors.text,
         })
         .setOrigin(0, 0.5)
         .setDepth(13)
       const joinBtn = this.add
-        .rectangle(listX + 120, y, 60, 24, isFull ? 0x2a1a2a : C.border)
-        .setStrokeStyle(1, isFull ? 0x553333 : C.selected)
+        .rectangle(listX + 120, y, 60, 24, isFull ? 0x2a1a2a : toHex(THEME.colors.border))
+        .setStrokeStyle(1, isFull ? 0x553333 : toHex(THEME.colors.secondary))
         .setDepth(13)
       const joinLabel = this.add
         .text(listX + 120, y, isFull ? "FULL" : "JOIN", {
-          fontSize: "11px",
-          color: isFull ? "#aa5555" : C.text,
-          fontStyle: "bold",
+          fontFamily: THEME.fonts.header,
+          fontSize: "10px",
+          color: isFull ? "#aa5555" : THEME.colors.white,
         })
         .setOrigin(0.5)
         .setDepth(14)
       if (!isFull) {
         joinBtn.setInteractive({ useHandCursor: true })
-        joinBtn.on("pointerover", () => joinBtn.setFillStyle(C.selected))
-        joinBtn.on("pointerout", () => joinBtn.setFillStyle(C.border))
+        joinBtn.on("pointerover", () => joinBtn.setFillStyle(toHex(THEME.colors.secondary)))
+        joinBtn.on("pointerout", () => joinBtn.setFillStyle(toHex(THEME.colors.border)))
         joinBtn.on("pointerdown", () => this.startWithLobbyId(lobby.roomId))
       }
       this.lobbyRows.push(rowBg, label, joinBtn, joinLabel)

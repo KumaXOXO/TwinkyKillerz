@@ -7,14 +7,10 @@ import { sendWheelDone, sendPlaceChip } from "../network/ColyseusClient"
 import { initJuice, type JuiceConfig } from "../juice/index"
 import { climax } from "../juice/climax"
 import { sounds } from "../utils/SoundManager"
+import { THEME, toHex } from "../utils/Theme"
+import { UIFactory } from "../utils/UIFactory"
 
 const RADIUS = 200
-const C = {
-  text: "#e8d5ff",
-  muted: "#7070a0",
-  crown: "#ffcc44",
-  chip: "#44ff88",
-}
 
 export class WheelScene extends Phaser.Scene {
   private room!: Room<GameState>
@@ -60,40 +56,66 @@ export class WheelScene extends Phaser.Scene {
     this.juice = initJuice()
     const { width, height } = this.scale
 
-    this.add
-      .text(width / 2, 36, "SPIN THE WHEEL", { fontSize: "24px", color: C.text, fontStyle: "bold" })
-      .setOrigin(0.5)
+    this.cameras.main.setPostPipeline('CRTPipeline')
+
+    UIFactory.createHeader(this, width / 2, 40, "OUTCOME ENGINE")
 
     const round = this.room.state.olympiade.currentRound
     this.add
-      .text(width / 2, 64, `Round ${round}`, { fontSize: "14px", color: C.muted })
+      .text(width / 2, 70, `SEQUENCE ${round}`, {
+        fontFamily: THEME.fonts.body,
+        fontSize: "18px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
 
     this.wheelContainer = this.add.container(width / 2, height / 2)
     this.buildWheel()
 
     const arrow = this.add.graphics()
-    arrow.fillStyle(0xff4444)
+    arrow.fillStyle(toHex(THEME.colors.primary))
     arrow.fillTriangle(
+      width / 2, height / 2 - RADIUS - 10,
+      width / 2 - 12, height / 2 - RADIUS - 34,
+      width / 2 + 12, height / 2 - RADIUS - 34,
+    )
+    arrow.lineStyle(2, toHex(THEME.colors.white))
+    arrow.strokeTriangle(
       width / 2, height / 2 - RADIUS - 10,
       width / 2 - 12, height / 2 - RADIUS - 34,
       width / 2 + 12, height / 2 - RADIUS - 34,
     )
 
     this.statusText = this.add
-      .text(width / 2, height / 2 + RADIUS + 50, "", { fontSize: "18px", color: C.text })
+      .text(width / 2, height / 2 + RADIUS + 50, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "20px",
+        color: THEME.colors.white
+      })
       .setOrigin(0.5)
 
     this.timerText = this.add
-      .text(width / 2, height / 2 + RADIUS + 80, "", { fontSize: "14px", color: C.muted })
+      .text(width / 2, height / 2 + RADIUS + 80, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "16px",
+        color: THEME.colors.muted
+      })
       .setOrigin(0.5)
 
     this.chipsText = this.add
-      .text(width / 2, height / 2 + RADIUS + 108, "", { fontSize: "14px", color: C.chip })
+      .text(width / 2, height / 2 + RADIUS + 108, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "16px",
+        color: THEME.colors.success
+      })
       .setOrigin(0.5)
 
     this.resultText = this.add
-      .text(width / 2, height / 2 + RADIUS + 90, "", { fontSize: "22px", color: C.crown, fontStyle: "bold" })
+      .text(width / 2, height / 2 + RADIUS + 90, "", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "24px",
+        color: THEME.colors.warning
+      })
       .setOrigin(0.5)
 
     this.cursors = this.input.keyboard!.createCursorKeys()
@@ -106,7 +128,7 @@ export class WheelScene extends Phaser.Scene {
     } else {
       const hasAnyChips = [...this.room.state.players.values()].some(p => p.chips > 0)
       if (!hasAnyChips) {
-        this.statusText.setText("No chips yet — first round!")
+        this.statusText.setText("NO CHIPS DETECTED")
         this.time.delayedCall(2000, () => {
           if (this.statusText?.active) this.statusText.setText("")
         })
@@ -121,7 +143,7 @@ export class WheelScene extends Phaser.Scene {
           this.room.onStateChange.remove(this.stateChangeCallback)
           this.stateChangeCallback = null
         }
-        this.resultText.setText(`Next: ${state.olympiade.currentMinigame.toUpperCase()}!`)
+        this.resultText.setText(`${state.olympiade.currentMinigame.toUpperCase()} LOADED`)
         this.timerText.setText("")
         this.chipsText.setText("")
         this.statusText.setText("")
@@ -152,7 +174,7 @@ export class WheelScene extends Phaser.Scene {
         0,
         Math.ceil((this.room.state.olympiade.wheel.placementDeadline - Date.now()) / 1000),
       )
-      this.timerText?.setText(`${remaining}s remaining`)
+      this.timerText?.setText(`TIMEOUT IN ${remaining}S`)
       return
     }
 
@@ -206,13 +228,21 @@ export class WheelScene extends Phaser.Scene {
   }
 
   private buildChipSidebar() {
-    this.add.text(10, 90, "CHIPS", { fontSize: "11px", color: C.muted })
-    let y = 110
+    this.add.text(15, 90, "RESOURCES", {
+      fontFamily: THEME.fonts.header,
+      fontSize: "10px",
+      color: THEME.colors.muted
+    })
+    let y = 115
     this.room.state.players.forEach((player, id) => {
-      const color = id === this.room.sessionId ? C.chip : C.muted
-      const t = this.add.text(10, y, "", { fontSize: "13px", color })
+      const color = id === this.room.sessionId ? THEME.colors.primary : THEME.colors.text
+      const t = this.add.text(15, y, "", {
+        fontFamily: THEME.fonts.body,
+        fontSize: "14px",
+        color
+      })
       this.chipSidebarTexts.set(id, t)
-      y += 20
+      y += 22
     })
     this.refreshChipSidebar()
   }
@@ -230,7 +260,7 @@ export class WheelScene extends Phaser.Scene {
   private buildPlacementUI() {
     const me = this.room.state.players.get(this.room.sessionId)
     if (!me || me.chips <= 0) {
-      this.statusText.setText("Waiting for chip placement...")
+      this.statusText.setText("WAITING FOR INPUT...")
       this.chipsText.setText("")
       return
     }
@@ -238,20 +268,24 @@ export class WheelScene extends Phaser.Scene {
     const myChips = me.chips
     const { width, height } = this.scale
 
-    this.statusText.setText("Place your chips on wheel segments!")
-    this.chipsText.setText(`You have ${myChips} chip${myChips !== 1 ? "s" : ""}`)
+    this.statusText.setText("ALLOCATE RESOURCES TO SEGMENTS")
+    this.chipsText.setText(`AVAILABLE: ${myChips}`)
 
     const games = [...MINIGAMES] as string[]
     const startY = height / 2 + RADIUS + 138
     games.forEach((game, idx) => {
       const chips = this.room.state.olympiade.wheel.fields.get(game)?.fixedChips ?? 0
-      const line = `[${idx + 1}] ${game.toUpperCase()}  (${chips} chip${chips !== 1 ? "s" : ""})`
+      const line = `[${idx + 1}] ${game.toUpperCase()} (${chips})`
       const t = this.add
-        .text(width / 2, startY + idx * 22, line, { fontSize: "13px", color: C.text })
+        .text(width / 2, startY + idx * 24, line, {
+          fontFamily: THEME.fonts.header,
+          fontSize: "14px",
+          color: THEME.colors.white
+        })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true })
-      t.on("pointerover", () => t.setColor(C.chip))
-      t.on("pointerout", () => t.setColor(C.text))
+      t.on("pointerover", () => t.setColor(THEME.colors.primary))
+      t.on("pointerout", () => t.setColor(THEME.colors.white))
       t.on("pointerdown", () => sendPlaceChip(idx))
       this.placementTexts.push(t)
 
@@ -277,10 +311,10 @@ export class WheelScene extends Phaser.Scene {
     const games = [...MINIGAMES] as string[]
 
     this.chipsText?.setText(
-      myChips > 0 ? `You have ${myChips} chip${myChips !== 1 ? "s" : ""}` : "",
+      myChips > 0 ? `AVAILABLE: ${myChips}` : "",
     )
     this.statusText?.setText(
-      myChips > 0 ? "Place your chips on wheel segments!" : "Waiting for chip placement...",
+      myChips > 0 ? "ALLOCATE RESOURCES TO SEGMENTS" : "WAITING FOR INPUT...",
     )
 
     games.forEach((game, idx) => {
@@ -288,7 +322,7 @@ export class WheelScene extends Phaser.Scene {
       const t = this.placementTexts[idx]
       if (!t) return
       const prefix = myChips > 0 ? `[${idx + 1}] ` : ""
-      t.setText(`${prefix}${game.toUpperCase()}  (${chips} chip${chips !== 1 ? "s" : ""})`)
+      t.setText(`${prefix}${game.toUpperCase()} (${chips})`)
     })
   }
 
@@ -298,9 +332,9 @@ export class WheelScene extends Phaser.Scene {
     const isSpinner = this.room.state.olympiade.wheel.spinnerId === this.room.sessionId
 
     this.statusText?.setText(
-      isSpinner ? "Press SPACE to spin!" : `Waiting for ${spinnerName} to spin...`,
+      isSpinner ? "PRESS [SPACE] TO EXECUTE" : `WAITING FOR ${spinnerName.toUpperCase()}`,
     )
-    this.timerText?.setText(isSpinner ? "← → or CLICK WHEEL to brake" : "")
+    this.timerText?.setText(isSpinner ? "← → / CLICK TO BRAKE" : "")
     this.chipsText?.setText("")
 
     if (isSpinner) {
@@ -309,7 +343,7 @@ export class WheelScene extends Phaser.Scene {
         if (v <= 0) return
         this.velocity = v
         this.isSpinning = true
-        this.timerText?.setText("← → or CLICK WHEEL to brake")
+        this.timerText?.setText("← → / CLICK TO BRAKE")
       }
       this.input.keyboard!.once("keydown-SPACE", this.spaceHandler)
       const { width, height } = this.scale
@@ -344,7 +378,7 @@ export class WheelScene extends Phaser.Scene {
     const total = weights.reduce((s, w) => s + w, 0)
 
     const g = this.add.graphics()
-    const palette = [0x2d1b4e, 0x1e3a5f, 0x4e1b2d, 0x1b4e2d, 0x4e3a1b]
+    const palette = [toHex(THEME.colors.panel), 0x1e3a5f, toHex(THEME.colors.border), 0x1b4e2d, 0x4e3a1b]
     let startAngle = -Math.PI / 2
 
     segments.forEach((game, i) => {
@@ -355,7 +389,7 @@ export class WheelScene extends Phaser.Scene {
       g.slice(0, 0, RADIUS, startAngle, end, false)
       g.fillPath()
 
-      g.lineStyle(2, 0x7744cc)
+      g.lineStyle(2, toHex(THEME.colors.secondary))
       g.beginPath()
       g.moveTo(0, 0)
       g.lineTo(Math.cos(startAngle) * RADIUS, Math.sin(startAngle) * RADIUS)
@@ -368,7 +402,12 @@ export class WheelScene extends Phaser.Scene {
           Math.cos(mid) * (RADIUS * 0.6),
           Math.sin(mid) * (RADIUS * 0.6),
           `${game.toUpperCase()}\n${pct}%`,
-          { fontSize: "14px", color: "#e8d5ff", fontStyle: "bold", align: "center" },
+          {
+            fontFamily: THEME.fonts.header,
+            fontSize: "12px",
+            color: THEME.colors.white,
+            align: "center"
+          },
         )
         .setOrigin(0.5)
       this.wheelContainer.add(label)
@@ -376,12 +415,21 @@ export class WheelScene extends Phaser.Scene {
       startAngle = end
     })
 
-    g.lineStyle(3, 0xaa66ff)
+    g.lineStyle(4, toHex(THEME.colors.secondary))
     g.strokeCircle(0, 0, RADIUS)
-    g.fillStyle(0x0d0d1a)
-    g.fillCircle(0, 0, 18)
+    g.fillStyle(toHex(THEME.colors.bg))
+    g.fillCircle(0, 0, 20)
+    g.strokeCircle(0, 0, 20)
 
     this.wheelContainer.addAt(g, 0)
+
+    // Slow rotate idle
+    this.tweens.add({
+      targets: this.wheelContainer,
+      angle: "+=360",
+      duration: 30000,
+      repeat: -1
+    });
   }
 
   private rebuildWheel() {
@@ -399,7 +447,7 @@ export class WheelScene extends Phaser.Scene {
     const chips = segments.map(g => this.room.state.olympiade.wheel.fields.get(g)?.fixedChips ?? 0)
     const weights = computeSegmentWeights(segments.length, chips)
     const total = weights.reduce((s, w) => s + w, 0)
-    let cumAngle = -90 // degrees, starting at top (matching buildWheel's -Math.PI/2)
+    let cumAngle = -90 // degrees, starting at top
     let targetAngle = 0
     for (let i = 0; i < segments.length; i++) {
       const arc = (weights[i] / total) * 360
@@ -421,7 +469,7 @@ export class WheelScene extends Phaser.Scene {
         void climax(this.juice, this, {
           hitstopMs: 60,
           shake: { intensity: 0.006, ms: 180 },
-          pop: { x: this.wheelContainer.x, y: this.wheelContainer.y, color: 0xffd700, count: 20 },
+          pop: { x: this.wheelContainer.x, y: this.wheelContainer.y, color: toHex(THEME.colors.primary), count: 20 },
         }).then(() => {
           this.time.delayedCall(1800, () => sendWheelDone())
         })
