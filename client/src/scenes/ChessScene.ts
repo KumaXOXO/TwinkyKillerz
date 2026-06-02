@@ -6,6 +6,9 @@ import { getLegalMoves, isInCheck, ChessPieceData } from "@twinky/shared/chessLo
 import { sendChessMove } from "../network/ColyseusClient"
 import { sounds } from "../utils/SoundManager"
 import { CheatHUD } from "../utils/CheatHUD"
+import { initJuice, type JuiceConfig } from "../juice/index"
+import { shake } from "../juice/helpers"
+import { climax } from "../juice/climax"
 
 const CELL_SIZE = 56
 const BOARD_OFFSET_X = (800 - CELL_SIZE * 8) / 2
@@ -29,6 +32,7 @@ export class ChessScene extends Phaser.Scene {
   private prevPositions: Map<string, { x: number; y: number }> = new Map()
   private prevScores: Map<string, number> = new Map()
   private wasInCheck = false
+  private juice!: JuiceConfig
   private cheatHUD!: CheatHUD
   private boardFlipped = false
 
@@ -72,6 +76,7 @@ export class ChessScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = initJuice()
     this.drawBoard()
     this.checkGraphics = this.add.graphics()
     this.highlightGraphics = this.add.graphics()
@@ -93,8 +98,20 @@ export class ChessScene extends Phaser.Scene {
           this.room.onStateChange.remove(this.stateChangeCallback)
           this.stateChangeCallback = null
         }
-        sounds.roundWin()
-        this.scene.start("ResultScene", { room: this.room })
+        const { width, height } = this.scale
+        const pieces = this.buildPiecesArray()
+        const oppKing = pieces.find(p => p.ownerId !== this.room.sessionId && p.pieceType === "king" && !p.isGhost)
+        const kingX = oppKing ? BOARD_OFFSET_X + this.boardCol(oppKing.col) * CELL_SIZE + CELL_SIZE / 2 : width / 2
+        const kingY = oppKing ? BOARD_OFFSET_Y + this.boardRow(oppKing.row) * CELL_SIZE + CELL_SIZE / 2 : height / 2
+        void climax(this.juice, this, {
+          hitstopMs: 80,
+          shake: { intensity: 0.009, ms: 240 },
+          pop: { x: kingX, y: kingY, color: 0xffdd44, count: 16 },
+        }).then(() => {
+          this.time.delayedCall(1800, () => {
+            this.scene.start("ResultScene", { room: this.room })
+          })
+        })
         return
       }
       this.renderPieces()
@@ -255,6 +272,7 @@ export class ChessScene extends Phaser.Scene {
       if (!this.wasInCheck) {
         sounds.check()
         this.flashScreen(0xff0000, 0.35)
+        shake(this.juice, this, 0.005, 160)
       }
       this.checkText.setText("CHECK!")
       const king = pieces.find(p => p.ownerId === myId && p.pieceType === "king" && !p.isGhost)
