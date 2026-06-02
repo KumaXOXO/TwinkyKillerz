@@ -5,14 +5,7 @@ import { joinByCode, getPublicLobbies, joinLobbyById, type LobbyInfo } from "../
 import { THEME, toHex } from "../utils/Theme"
 import { UIFactory } from "../utils/UIFactory"
 
-const COLS = 3
-const ROWS = 3
-const CARD_W = 180
-const CARD_H = 140
-const GAP = 15
-const GRID_LEFT = (800 - COLS * CARD_W - (COLS - 1) * GAP) / 2
-const GRID_TOP = 220
-const VERSION = "v0.5.0-BALATRO"
+const VERSION = "v0.5.1-MODULAR"
 
 export class CharacterSelectScene extends Phaser.Scene {
   private typedName = ""
@@ -41,10 +34,10 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   preload() {
-    // Attempting to match the sheet layout based on dimension check (1285x832)
-    this.load.spritesheet('char_main', 'assets/Gemini_Generated_Image_qhrnp3qhrnp3qhrn.png', { frameWidth: 128, frameHeight: 128 });
-    this.load.spritesheet('char_robin', 'assets/Gemini_Generated_Image_m0w3i8m0w3i8m0w3.png', { frameWidth: 128, frameHeight: 128 });
-    this.load.spritesheet('char_ingo', 'assets/Gemini_Generated_Image_5pmfmo5pmfmo5pmf.png', { frameWidth: 128, frameHeight: 128 });
+    // Slicing based on pixel analysis: 80px wide frames, 192px row height
+    this.load.spritesheet('char_main', 'assets/Gemini_Generated_Image_qhrnp3qhrnp3qhrn.png', { frameWidth: 80, frameHeight: 192 });
+    this.load.spritesheet('char_robin', 'assets/Gemini_Generated_Image_m0w3i8m0w3i8m0w3.png', { frameWidth: 80, frameHeight: 192 });
+    this.load.spritesheet('char_ingo', 'assets/Gemini_Generated_Image_5pmfmo5pmfmo5pmf.png', { frameWidth: 80, frameHeight: 192 });
   }
 
   create() {
@@ -52,85 +45,66 @@ export class CharacterSelectScene extends Phaser.Scene {
     sounds.resume()
     this.cameras.main.setPostPipeline('CRTPipeline')
 
-    // Setup Animations (4 frames each)
+    // Setup Animations (4 frames for run cycle)
     CHARACTERS.forEach((ch) => {
-      // Main sheet has multiple characters. Let's map their start frame.
-      // 1285 / 128 is ~10 frames per row.
-      let startFrame = 0;
-      if (ch.asset === 'char_main') {
-          // lucas: 0, fedor: 3 (rough guess), dodo: 6
-          // but if row 0 has 3 characters, maybe 4 frames each?
-          // Lucas: 0-3, Fedor: 4-7, Dodo: 8-11? (128*10 = 1280)
-          startFrame = ch.frameRow * 10;
-      } else if (ch.asset === 'char_ingo') {
-          startFrame = ch.frameRow * 10;
-      }
-
       this.anims.create({
         key: `anim_${ch.id}`,
-        frames: this.anims.generateFrameNumbers(ch.asset, { start: startFrame, end: startFrame + 3 }),
-        frameRate: 8,
+        frames: this.anims.generateFrameNumbers(ch.asset, { start: ch.startFrame, end: ch.startFrame + 3 }),
+        frameRate: 10,
         repeat: -1
       });
     });
 
-    UIFactory.createHeader(this, width / 2, 40, "TWINKY GAMES")
+    UIFactory.createHeader(this, width / 2, 40, "IDENTITY SELECTION")
 
     this.add
-      .text(width / 2, 88, "Choose your character", {
+      .text(width / 2, 75, "AUTHORIZED PERSONNEL ONLY", {
         fontFamily: THEME.fonts.body,
-        fontSize: "20px",
+        fontSize: "16px",
         color: THEME.colors.muted
       })
       .setOrigin(0.5)
-
-    this.add
-      .text(width - 8, height - 8, VERSION, {
-        fontFamily: THEME.fonts.body,
-        fontSize: "12px",
-        color: THEME.colors.muted
-      })
-      .setOrigin(1, 1)
 
     // Name input box
-    this.add
-      .text(width / 2, 148, "Your name:", {
-        fontFamily: THEME.fonts.body,
-        fontSize: "18px",
-        color: THEME.colors.muted
-      })
-      .setOrigin(0.5)
-
-    this.add.rectangle(width / 2, 178, 300, 44, toHex(THEME.colors.black)).setStrokeStyle(2, toHex(THEME.colors.border))
+    this.add.rectangle(width / 2, 120, 320, 40, toHex(THEME.colors.black)).setStrokeStyle(2, toHex(THEME.colors.border))
     this.nameText = this.add
-      .text(width / 2, 178, "", {
+      .text(width / 2, 120, "", {
         fontFamily: THEME.fonts.header,
-        fontSize: "20px",
+        fontSize: "18px",
         color: THEME.colors.white
       })
       .setOrigin(0.5)
 
-    // Character grid
+    // Modular Character Grid
+    const CARD_W = 140
+    const CARD_H = 180
+    const GAP = 15
+    const MAX_COLS = 4
+    const cols = Math.min(CHARACTERS.length, MAX_COLS)
+    const gridWidth = cols * CARD_W + (cols - 1) * GAP
+    const startX = (width - gridWidth) / 2 + CARD_W / 2
+    const startY = 240
+
     CHARACTERS.forEach((ch, i) => {
-      const col = i % COLS
-      const row = Math.floor(i / COLS)
-      const cx = GRID_LEFT + col * (CARD_W + GAP) + CARD_W / 2
-      const cy = GRID_TOP + row * (CARD_H + GAP) + CARD_H / 2
+      const col = i % MAX_COLS
+      const row = Math.floor(i / MAX_COLS)
+      const cx = startX + col * (CARD_W + GAP)
+      const cy = startY + row * (CARD_H + GAP)
 
       const container = this.add.container(cx, cy)
       const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, toHex(THEME.colors.panel))
         .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
 
-      const startFrame = (ch.asset === 'char_main' || ch.asset === 'char_ingo') ? ch.frameRow * 10 : 0;
-      const sprite = this.add.sprite(0, -10, ch.asset, startFrame).setScale(0.8)
+      // Sprite - scaled up because pixel art is small
+      const sprite = this.add.sprite(0, -10, ch.asset, ch.startFrame).setScale(1.2)
 
-      const name = this.add.text(0, 50, ch.name.toUpperCase(), {
+      const name = this.add.text(0, 65, ch.name.toUpperCase(), {
         fontFamily: THEME.fonts.header,
-        fontSize: "10px",
+        fontSize: "9px",
         color: ch.color,
         align: 'center',
-        wordWrap: { width: CARD_W - 10 }
+        wordWrap: { width: CARD_W - 20 }
       }).setOrigin(0.5)
 
       container.add([bg, sprite, name])
@@ -147,55 +121,53 @@ export class CharacterSelectScene extends Phaser.Scene {
       bg.on("pointerover", () => {
         this.tweens.add({
           targets: container,
-          scale: 1.1,
-          y: cy - 5,
+          scale: 1.08,
           duration: 150,
-          ease: 'Power1'
+          ease: 'Power2'
         })
+        bg.setFillStyle(0xffffff, 0.2) // White glow
+        bg.setStrokeStyle(3, 0xffffff)
         sprite.play(`anim_${ch.id}`)
       })
 
       bg.on("pointerout", () => {
+        const isSelected = this.selectedIdx === i
         this.tweens.add({
           targets: container,
-          scale: this.selectedIdx === i ? 1.05 : 1,
-          y: this.selectedIdx === i ? cy - 5 : cy,
+          scale: isSelected ? 1.05 : 1,
           duration: 150,
-          ease: 'Power1'
+          ease: 'Power2'
         })
-        if (this.selectedIdx !== i) {
+        if (!isSelected) {
+          bg.setFillStyle(toHex(THEME.colors.panel))
+          bg.setStrokeStyle(2, toHex(THEME.colors.border))
           sprite.stop()
-          sprite.setFrame(startFrame)
+          sprite.setFrame(ch.startFrame)
+        } else {
+          bg.setFillStyle(0x2a1a4e)
+          bg.setStrokeStyle(2, toHex(THEME.colors.primary))
         }
       })
 
-      // Idle wobble
+      // Idle float
       this.tweens.add({
         targets: container,
-        angle: { from: -0.5, to: 0.5 },
-        duration: 3000 + Math.random() * 2000,
+        y: cy - 3,
+        duration: 2000 + Math.random() * 1000,
         ease: 'Sine.easeInOut',
         yoyo: true,
         loop: -1
       })
     })
 
-    this.hintText = this.add
-      .text(width / 2, height - 30, "Arrows: choose character  |  ENTER: create room", {
-        fontFamily: THEME.fonts.body,
-        fontSize: "14px",
-        color: THEME.colors.muted,
-      })
-      .setOrigin(0.5)
-
-    const btnY = height - 75
-    this.createBtn = UIFactory.createButton(this, width / 2 - 110, btnY, 200, 44, "CREATE ROOM", () => {
+    const btnY = height - 50
+    this.createBtn = UIFactory.createButton(this, width / 2 - 130, btnY, 240, 40, "CREATE ROOM", () => {
       if (!this.typedName.trim()) return
       sounds.menuConfirm()
       this.showCreateDialog()
     })
 
-    this.joinBtn = UIFactory.createButton(this, width / 2 + 110, btnY, 200, 44, "JOIN WITH CODE", () => {
+    this.joinBtn = UIFactory.createButton(this, width / 2 + 130, btnY, 240, 40, "JOIN WITH CODE", () => {
       if (!this.typedName.trim()) return
       sounds.menuNav()
       this.showCodeInput()
@@ -255,12 +227,13 @@ export class CharacterSelectScene extends Phaser.Scene {
       sounds.menuNav()
       this.refreshSelection()
     } else if (event.key === "ArrowUp") {
-      this.selectedIdx = (this.selectedIdx - COLS + CHARACTERS.length) % CHARACTERS.length
-      if (this.selectedIdx < 0) this.selectedIdx += CHARACTERS.length
+      const MAX_COLS = 4
+      this.selectedIdx = (this.selectedIdx - MAX_COLS + CHARACTERS.length) % CHARACTERS.length
       sounds.menuNav()
       this.refreshSelection()
     } else if (event.key === "ArrowDown") {
-      this.selectedIdx = (this.selectedIdx + COLS) % CHARACTERS.length
+      const MAX_COLS = 4
+      this.selectedIdx = (this.selectedIdx + MAX_COLS) % CHARACTERS.length
       sounds.menuNav()
       this.refreshSelection()
     } else if (event.key === "Enter") {
@@ -287,7 +260,6 @@ export class CharacterSelectScene extends Phaser.Scene {
       const container = this.cardContainers[i]
       const sprite = this.characterSprites[i]
       const ch = CHARACTERS[i]
-      const startFrame = (ch.asset === 'char_main' || ch.asset === 'char_ingo') ? ch.frameRow * 10 : 0;
 
       if (isSelected) {
         this.tweens.add({
@@ -305,7 +277,7 @@ export class CharacterSelectScene extends Phaser.Scene {
           ease: 'Power1'
         })
         sprite.stop()
-        sprite.setFrame(startFrame)
+        sprite.setFrame(ch.startFrame)
       }
     })
   }
@@ -416,6 +388,14 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.codeDisplayText = codeDisplay
     this.codeErrorText = errText
     this.choiceGroup.push(overlay, title, listTitle, listBg, codeTitle, codeBg, codeInputBox, codeDisplay, codeHint, errText, closeHint)
+
+    this.pasteListener = (e: ClipboardEvent) => {
+      if (this.joinPhase !== "codeInput") return
+      const cleaned = (e.clipboardData?.getData("text") ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6)
+      if (cleaned) { this.typedCode = cleaned; this.updateCodeDisplay() }
+      e.preventDefault()
+    }
+    window.addEventListener("paste", this.pasteListener)
 
     this.refreshLobbyList()
     this.refreshTimer = this.time.addEvent({

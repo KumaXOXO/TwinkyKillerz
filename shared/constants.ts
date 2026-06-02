@@ -73,14 +73,14 @@ export const CHESS_PIECE_SYMBOLS: Record<string, string> = {
 export const CHESS_TURN_MS = 30_000
 
 export const CHARACTERS = [
-  { id: "lucas", name: "Lucas", color: "#ff006e", asset: "char_main", frameRow: 0, symbol: "🧶" },
-  { id: "fedor", name: "Fedor", color: "#3a86ff", asset: "char_main", frameRow: 1, symbol: "🧠" },
-  { id: "dodo", name: "Dodo", color: "#ffffff", asset: "char_main", frameRow: 2, symbol: "⚡" },
-  { id: "christian", name: "Christian", color: "#8338ec", asset: "char_main", frameRow: 3, symbol: "🧔" },
-  { id: "grhost", name: "GR-Host", color: "#00f5d4", asset: "char_main", frameRow: 4, symbol: "🎧" },
-  { id: "robin", name: "Robin Reinhardt", color: "#ffbe0b", asset: "char_robin", frameRow: 0, symbol: "🏹" },
-  { id: "ingo_p", name: "Ingo P.", color: "#44ff88", asset: "char_ingo", frameRow: 0, symbol: "👮" },
-  { id: "ingo_p_f", name: "Ingo P. Female", color: "#ff6688", asset: "char_ingo", frameRow: 1, symbol: "👗" },
+  { id: "lucas", name: "Blonde Podcaster", color: "#ff006e", asset: "char_main", frameRow: 0, startFrame: 0, symbol: "🧶" },
+  { id: "fedor", name: "Geek Streamr", color: "#3a86ff", asset: "char_main", frameRow: 0, startFrame: 4, symbol: "🧠" },
+  { id: "dodo", name: "Lockiger zuschauer", color: "#ffffff", asset: "char_main", frameRow: 0, startFrame: 8, symbol: "⚡" },
+  { id: "christian", name: "Bearded Gamer", color: "#8338ec", asset: "char_main", frameRow: 1, startFrame: 10, symbol: "🧔" },
+  { id: "grhost", name: "Grinsender CO-Host", color: "#00f5d4", asset: "char_main", frameRow: 1, startFrame: 14, symbol: "🎧" },
+  { id: "robin", name: "Robin Reinhardt", color: "#ffbe0b", asset: "char_robin", frameRow: 0, startFrame: 0, symbol: "🏹" },
+  { id: "ingo_p", name: "Ingo P.", color: "#44ff88", asset: "char_ingo", frameRow: 0, startFrame: 0, symbol: "👮" },
+  { id: "ingo_p_f", name: "Ingo P. Female", color: "#ff6688", asset: "char_ingo", frameRow: 1, startFrame: 10, symbol: "👗" },
 ] as const
 
 export type CharacterId = (typeof CHARACTERS)[number]["id"]
