@@ -51,9 +51,9 @@ export class ResultScene extends Phaser.Scene {
         .setAlpha(0)
       this.tweens.add({ targets: [nameText, scoreText], alpha: 1, delay, duration: 350 })
 
-      if (player.chips > 0) {
+      if (player.chipsEarned > 0) {
         const chipText = this.add
-          .text(width / 2 + 120, y, `+${player.chips} chip${player.chips !== 1 ? "s" : ""}`, {
+          .text(width / 2 + 120, y, `+${player.chipsEarned} chip${player.chipsEarned !== 1 ? "s" : ""}`, {
             fontSize: "14px",
             color: C.chip,
           })

@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
-import { MINIGAMES, PHASER_NUM_KEYS } from "@twinky/shared/constants"
+import { MINIGAMES } from "@twinky/shared/constants"
 import { sendSelectGame } from "../network/ColyseusClient"
 
 export class GameSelectScene extends Phaser.Scene {
@@ -48,10 +48,7 @@ export class GameSelectScene extends Phaser.Scene {
           })
           .setOrigin(0.5)
 
-        const keyName = PHASER_NUM_KEYS[idx + 1]
-        if (keyName) {
-          this.input.keyboard?.once(`keydown-${keyName}`, () => sendSelectGame(game))
-        }
+        this.input.keyboard?.once(`keydown-${idx + 1}`, () => sendSelectGame(game))
       })
     } else {
       const gmEntry = [...this.room.state.players.values()].find(p => p.isGamemaster)

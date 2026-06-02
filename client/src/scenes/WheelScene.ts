@@ -1,7 +1,7 @@
 import Phaser from "phaser"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
-import { MINIGAMES, WHEEL_ARROW_INFLUENCE, WHEEL_BASE_DECEL, PHASER_NUM_KEYS } from "@twinky/shared/constants"
+import { MINIGAMES, WHEEL_ARROW_INFLUENCE, WHEEL_BASE_DECEL } from "@twinky/shared/constants"
 import { computeSegmentWeights } from "@twinky/shared/wheelLogic"
 import { sendWheelDone, sendPlaceChip } from "../network/ColyseusClient"
 import { initJuice, type JuiceConfig } from "../juice/index"
@@ -30,6 +30,7 @@ export class WheelScene extends Phaser.Scene {
   private stateChangeCallback: ((state: GameState) => void) | null = null
   private spaceHandler: (() => void) | null = null
   private placementTexts: Phaser.GameObjects.Text[] = []
+  private placementKeyHandlers: Array<() => void> = []
   private chipsText!: Phaser.GameObjects.Text
   private timerText!: Phaser.GameObjects.Text
   private statusText!: Phaser.GameObjects.Text
@@ -51,6 +52,7 @@ export class WheelScene extends Phaser.Scene {
     this.isDone = false
     this.inPlacementPhase = false
     this.placementTexts = []
+    this.placementKeyHandlers = []
     this.chipSidebarTexts = new Map()
   }
 
@@ -102,6 +104,13 @@ export class WheelScene extends Phaser.Scene {
     if (this.inPlacementPhase) {
       this.buildPlacementUI()
     } else {
+      const hasAnyChips = [...this.room.state.players.values()].some(p => p.chips > 0)
+      if (!hasAnyChips) {
+        this.statusText.setText("No chips yet — first round!")
+        this.time.delayedCall(2000, () => {
+          if (this.statusText?.active) this.statusText.setText("")
+        })
+      }
       this.buildSpinUI()
     }
 
@@ -240,26 +249,27 @@ export class WheelScene extends Phaser.Scene {
       const t = this.add
         .text(width / 2, startY + idx * 22, line, { fontSize: "13px", color: C.text })
         .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true })
+      t.on("pointerover", () => t.setColor(C.chip))
+      t.on("pointerout", () => t.setColor(C.text))
+      t.on("pointerdown", () => sendPlaceChip(idx))
       this.placementTexts.push(t)
 
-      const keyName = PHASER_NUM_KEYS[idx + 1]
-      if (keyName) {
-        this.input.keyboard?.on(`keydown-${keyName}`, () => sendPlaceChip(idx))
-      }
+      const handler = () => sendPlaceChip(idx)
+      this.placementKeyHandlers[idx] = handler
+      this.input.keyboard?.on(`keydown-${idx + 1}`, handler)
     })
   }
 
   private clearPlacementUI() {
     for (const t of this.placementTexts) t.destroy()
     this.placementTexts = []
-    // Remove digit key listeners
     const games = [...MINIGAMES] as string[]
     games.forEach((_g, idx) => {
-      const keyName = PHASER_NUM_KEYS[idx + 1]
-      if (keyName) {
-        this.input.keyboard?.removeAllListeners(`keydown-${keyName}`)
-      }
+      const handler = this.placementKeyHandlers[idx]
+      if (handler) this.input.keyboard?.removeListener(`keydown-${idx + 1}`, handler)
     })
+    this.placementKeyHandlers = []
   }
 
   private refreshPlacementUI() {
@@ -385,8 +395,20 @@ export class WheelScene extends Phaser.Scene {
     const desiredIdx = segments.indexOf(
       this.room.state.olympiade.currentMinigame as (typeof MINIGAMES)[number],
     )
-    const segSize = 360 / segments.length
-    const targetAngle = -((desiredIdx + 0.5) * segSize)
+    // Compute actual mid-angle using chip-weighted segment sizes
+    const chips = segments.map(g => this.room.state.olympiade.wheel.fields.get(g)?.fixedChips ?? 0)
+    const weights = computeSegmentWeights(segments.length, chips)
+    const total = weights.reduce((s, w) => s + w, 0)
+    let cumAngle = -90 // degrees, starting at top (matching buildWheel's -Math.PI/2)
+    let targetAngle = 0
+    for (let i = 0; i < segments.length; i++) {
+      const arc = (weights[i] / total) * 360
+      if (i === desiredIdx) {
+        targetAngle = -(cumAngle + arc / 2)
+        break
+      }
+      cumAngle += arc
+    }
     const n = Math.round((this.angle - targetAngle) / 360)
     const snapAngle = targetAngle + n * 360
 

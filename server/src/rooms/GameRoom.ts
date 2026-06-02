@@ -25,6 +25,7 @@ import { computeSegmentWeights, pickWeightedIndex } from "../../../shared/wheelL
 interface JoinOptions {
   name: string
   characterId: string
+  roomCode?: string
 }
 
 interface CheatAttemptMsg {
@@ -69,6 +70,7 @@ export class GameRoom extends Room<GameState> {
     this.setState(new GameState())
     this.state.roomCode = generateRoomCode()
     this.state.isPrivate = options.isPrivate === true
+    this.filterBy(["roomCode"])
     this.onMessage("player_ready", (client, msg) => this.handlePlayerReady(client, msg))
     this.onMessage("cheat_attempt", (client, msg: CheatAttemptMsg) =>
       this.handleCheatAttempt(client, msg)
@@ -104,7 +106,10 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  onAuth(_client: Client, _options: unknown): boolean {
+  onAuth(_client: Client, options: JoinOptions): boolean {
+    if (options.roomCode && options.roomCode.toUpperCase() !== this.state.roomCode) {
+      throw new Error("Room not found")
+    }
     const connectedCount = [...this.state.players.values()].filter((p) => p.isConnected).length
     if (connectedCount >= this.state.maxPlayers) {
       throw new Error("Room is full")
@@ -494,14 +499,20 @@ export class GameRoom extends Room<GameState> {
       const pid = this.chessEliminationOrder[i]
       if (pid !== winnerId) finishOrder.push(pid)
     }
+    for (const p of this.state.players.values()) p.chipsEarned = 0
     finishOrder.forEach((pid, idx) => {
       const player = this.state.players.get(pid)
       if (!player) return
       player.score += SCORE_PLACEMENT[idx] ?? 0
       // Lower placements earn chips to influence next wheel spin
       const totalPlayers = finishOrder.length
-      if (idx === totalPlayers - 1) player.chips += CHIPS_LAST_PLACE
-      else if (idx === totalPlayers - 2) player.chips += CHIPS_SECOND_LAST
+      let earned = 0
+      if (idx === totalPlayers - 1) earned = CHIPS_LAST_PLACE
+      else if (idx === totalPlayers - 2) earned = CHIPS_SECOND_LAST
+      if (earned > 0) {
+        player.chips += earned
+        player.chipsEarned = earned
+      }
     })
   }
 
@@ -583,13 +594,19 @@ export class GameRoom extends Room<GameState> {
       if (id !== winnerId) finishOrder.push(id)
     }
 
+    for (const p of this.state.players.values()) p.chipsEarned = 0
     finishOrder.forEach((pid, idx) => {
       const player = this.state.players.get(pid)
       if (!player) return
       player.score += SCORE_PLACEMENT[idx] ?? 0
       const totalPlayers = finishOrder.length
-      if (idx === totalPlayers - 1) player.chips += CHIPS_LAST_PLACE
-      else if (idx === totalPlayers - 2) player.chips += CHIPS_SECOND_LAST
+      let earned = 0
+      if (idx === totalPlayers - 1) earned = CHIPS_LAST_PLACE
+      else if (idx === totalPlayers - 2) earned = CHIPS_SECOND_LAST
+      if (earned > 0) {
+        player.chips += earned
+        player.chipsEarned = earned
+      }
     })
   }
 }

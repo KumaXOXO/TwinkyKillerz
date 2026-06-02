@@ -63,6 +63,7 @@ export class PlayerState extends Schema {
   @type("string") characterId: string = ""
   @type("number") score: number = 0
   @type("number") chips: number = 0
+  @type("number") chipsEarned: number = 0
   @type("boolean") isConnected: boolean = true
   @type("boolean") isReady: boolean = false
   @type("boolean") isGamemaster: boolean = false
