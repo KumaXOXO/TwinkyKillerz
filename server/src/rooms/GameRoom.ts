@@ -70,7 +70,6 @@ export class GameRoom extends Room<GameState> {
     this.setState(new GameState())
     this.state.roomCode = generateRoomCode()
     this.state.isPrivate = options.isPrivate === true
-    this.filterBy(["roomCode"])
     this.onMessage("player_ready", (client, msg) => this.handlePlayerReady(client, msg))
     this.onMessage("cheat_attempt", (client, msg: CheatAttemptMsg) =>
       this.handleCheatAttempt(client, msg)
@@ -98,18 +97,12 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("select_game", (client, msg) => this.handleSelectGame(client, msg))
     try {
       await this.updateRoomMetadata()
-      if (this.state.isPrivate) {
-        await this.setPrivate(true)
-      }
     } catch (err) {
       console.error("onCreate metadata setup failed", err)
     }
   }
 
-  onAuth(_client: Client, options: JoinOptions): boolean {
-    if (options.roomCode && options.roomCode.toUpperCase() !== this.state.roomCode) {
-      throw new Error("Room not found")
-    }
+  onAuth(_client: Client, _options: JoinOptions): boolean {
     const connectedCount = [...this.state.players.values()].filter((p) => p.isConnected).length
     if (connectedCount >= this.state.maxPlayers) {
       throw new Error("Room is full")

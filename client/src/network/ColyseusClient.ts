@@ -23,7 +23,14 @@ export async function joinGame(
   name: string,
   characterId: string
 ): Promise<Room<GameState>> {
-  _room = await getClient().joinOrCreate<GameState>("game_room", { name, characterId })
+  const rooms = await getClient().getAvailableRooms<{ isPrivate: boolean }>('game_room')
+  const available = rooms.filter(r => !r.metadata?.isPrivate && r.clients < (r.maxClients ?? 4))
+  if (available.length > 0) {
+    const target = available.sort((a, b) => (b.clients ?? 0) - (a.clients ?? 0))[0]!
+    _room = await getClient().joinById<GameState>(target.roomId, { name, characterId })
+  } else {
+    _room = await getClient().create<GameState>('game_room', { name, characterId })
+  }
   return _room
 }
 
@@ -42,16 +49,14 @@ export async function joinByCode(
   roomCode: string,
 ): Promise<Room<GameState>> {
   const code = roomCode.toUpperCase().trim()
+  const rooms = await getClient().getAvailableRooms<{ roomCode: string }>('game_room')
+  const target = rooms.find(r => r.metadata?.roomCode === code)
+  if (!target) throw new Error("Room not found")
   try {
-    _room = await getClient().join<GameState>("game_room", { roomCode: code, name, characterId })
+    _room = await getClient().joinById<GameState>(target.roomId, { name, characterId })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Join failed"
-    if (msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("no rooms")) {
-      throw new Error("Room not found")
-    }
-    if (msg.toLowerCase().includes("locked") || msg.toLowerCase().includes("full")) {
-      throw new Error("Room is full")
-    }
+    if (msg.toLowerCase().includes("full")) throw new Error("Room is full")
     throw new Error(msg)
   }
   return _room
