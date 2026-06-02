@@ -255,8 +255,12 @@ export class Connect4Scene extends Phaser.Scene {
         sounds.connect4Thunk(targetRow * 8)
         const cell = this.cellGraphics[idx]
         if (cell?.active) {
+          cell.clear()
+          cell.fillStyle(color)
+          cell.fillCircle(cx, endY, radius)
+          cell.fillStyle(0xffffff, 0.2)
+          cell.fillCircle(cx - 6, endY - 6, 8)
           punch(this.juice, cell, 1.2, 120)
-          // Impact particles
           this.emitImpactParticles(cx, endY, color)
         }
       },

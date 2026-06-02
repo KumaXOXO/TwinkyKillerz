@@ -1,5 +1,5 @@
 import Phaser from "phaser"
-import { joinGame, createRoom, joinByCode, sendPlayerReady, sendChat, sendGamemasterSettings, sendTransferGamemaster } from "../network/ColyseusClient"
+import { joinGame, createRoom, joinByCode, sendPlayerReady, sendChat, sendGamemasterSettings, sendTransferGamemaster, sendKickPlayer } from "../network/ColyseusClient"
 import type { Room } from "colyseus.js"
 import type { GameState } from "@twinky/shared/schema"
 import { CHARACTERS } from "@twinky/shared/constants"
@@ -30,7 +30,14 @@ export class LobbyScene extends Phaser.Scene {
   private settingsText!: Phaser.GameObjects.Text
   private hintText!: Phaser.GameObjects.Text
   private actionBtn!: Phaser.GameObjects.Container
+  private gmBtnPlayerDec!: Phaser.GameObjects.Container
+  private gmBtnPlayerInc!: Phaser.GameObjects.Container
+  private gmBtnMode!: Phaser.GameObjects.Container
+  private gmBtnPrivacy!: Phaser.GameObjects.Container
+  private gmBtnModeText!: Phaser.GameObjects.Text
+  private gmBtnPrivacyText!: Phaser.GameObjects.Text
   private playerEntries: Phaser.GameObjects.Text[] = []
+  private kickPopup: Phaser.GameObjects.Container | null = null
   private stateChangeCallback: ((state: GameState) => void) | null = null
 
   constructor() {
@@ -174,8 +181,36 @@ export class LobbyScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    this.actionBtn = UIFactory.createButton(this, width / 2, 554, 300, 44, "READY (SPACE)", () => sendPlayerReady())
+    this.actionBtn = UIFactory.createButton(this, width / 2, 554, 220, 44, "READY", () => sendPlayerReady())
     this.actionText = (this.actionBtn.list[1] as Phaser.GameObjects.Text)
+
+    // GM control buttons flanking the ready button
+    const mkSmall = (label: string, x: number, y: number, w: number, cb: () => void) => {
+      const btn = UIFactory.createButton(this, x, y, w, 32, label, cb)
+      btn.setAlpha(0)
+      return btn
+    }
+    this.gmBtnPlayerDec = mkSmall("◄", width / 2 - 200, 554, 36, () => {
+      if (!this.room) return
+      const cur = this.room.state.maxPlayers
+      if (cur > 2) sendGamemasterSettings(cur - 1)
+    })
+    this.gmBtnPlayerInc = mkSmall("►", width / 2 - 156, 554, 36, () => {
+      if (!this.room) return
+      const cur = this.room.state.maxPlayers
+      if (cur < 4) sendGamemasterSettings(cur + 1)
+    })
+    this.gmBtnMode = mkSmall("MODE", width / 2 + 168, 554, 70, () => {
+      if (!this.room) return
+      const next = this.room.state.gameMode === "olympiade" ? "single" : "olympiade"
+      sendGamemasterSettings(undefined, next)
+    })
+    this.gmBtnModeText = (this.gmBtnMode.list[1] as Phaser.GameObjects.Text)
+    this.gmBtnPrivacy = mkSmall("PUBLIC", width / 2 + 246, 554, 80, () => {
+      if (!this.room) return
+      sendGamemasterSettings(undefined, undefined, !this.room.state.isPrivate)
+    })
+    this.gmBtnPrivacyText = (this.gmBtnPrivacy.list[1] as Phaser.GameObjects.Text)
 
     this.hintText = this.add.text(width / 2, 588, "", {
       fontFamily: THEME.fonts.body,
@@ -204,21 +239,18 @@ export class LobbyScene extends Phaser.Scene {
       const label = `${prefix}${symbol} ${p.name}${suffix}`
       const isMe = id === this.room?.sessionId
       const meIsGM = state.players.get(this.room?.sessionId ?? "")?.isGamemaster ?? false
-      const canTransfer = meIsGM && !p.isGamemaster
+      const canAct = meIsGM && !p.isGamemaster
 
       const t = this.add.text(35, py, label, {
         fontFamily: THEME.fonts.body,
         fontSize: "18px",
         color: isMe ? THEME.colors.primary : THEME.colors.text,
       })
-      if (canTransfer) {
+      if (canAct) {
         t.setInteractive({ useHandCursor: true })
         t.on("pointerover", () => t.setColor(THEME.colors.warning))
         t.on("pointerout", () => t.setColor(isMe ? THEME.colors.primary : THEME.colors.text))
-        t.on("pointerdown", () => {
-          sounds.menuConfirm()
-          sendTransferGamemaster(id)
-        })
+        t.on("pointerdown", () => this.showPlayerPopup(id, p.name, t.x + t.width / 2, t.y))
       }
       this.playerEntries.push(t)
       py += 28
@@ -230,14 +262,21 @@ export class LobbyScene extends Phaser.Scene {
     this.chatLogText?.setText(chatLines.join("\n"))
 
     const visibility = state.isPrivate ? "PRIVATE" : "PUBLIC"
+    const modeLabel = (state.gameMode ?? "olympiade").toUpperCase()
     if (me?.isGamemaster) {
-      this.settingsText?.setText(
-        `[←/→] PLAYERS: ${state.maxPlayers}   [M] MODE: ${(state.gameMode ?? "olympiade").toUpperCase()}   ${visibility}`
-      )
+      this.settingsText?.setText(`PLAYERS: ${state.maxPlayers}   MODE: ${modeLabel}   ${visibility}`)
+      this.gmBtnPlayerDec?.setAlpha(state.maxPlayers > 2 ? 1 : 0.3)
+      this.gmBtnPlayerInc?.setAlpha(state.maxPlayers < 4 ? 1 : 0.3)
+      this.gmBtnMode?.setAlpha(1)
+      this.gmBtnPrivacy?.setAlpha(1)
+      this.gmBtnModeText?.setText(modeLabel === "OLYMPIADE" ? "OLY" : "1V1")
+      this.gmBtnPrivacyText?.setText(state.isPrivate ? "PRVT" : "PUB")
     } else {
-      this.settingsText?.setText(
-        `MODE: ${(state.gameMode ?? "olympiade").toUpperCase()}   PLAYERS: ${state.maxPlayers}   ${visibility}`
-      )
+      this.settingsText?.setText(`MODE: ${modeLabel}   PLAYERS: ${state.maxPlayers}   ${visibility}`)
+      this.gmBtnPlayerDec?.setAlpha(0)
+      this.gmBtnPlayerInc?.setAlpha(0)
+      this.gmBtnMode?.setAlpha(0)
+      this.gmBtnPrivacy?.setAlpha(0)
     }
 
     const connected = [...state.players.values()].filter((p) => p.isConnected)
@@ -252,10 +291,52 @@ export class LobbyScene extends Phaser.Scene {
     }
 
     this.hintText?.setText(
-      this.inputMode === "chat"
-        ? "ESC cancel  |  ENTER send"
-        : "C — chat   |   </> players (GM)   |   M mode (GM)",
+      this.inputMode === "chat" ? "ESC cancel  |  ENTER send" : "C — chat   |   SPACE — ready"
     )
+  }
+
+  private showPlayerPopup(targetId: string, name: string, x: number, y: number) {
+    this.kickPopup?.destroy()
+    this.kickPopup = null
+    const { width } = this.scale
+    const px = Math.min(x, width - 130)
+    const popup = this.add.container(px, y + 30)
+    const bg = this.add.rectangle(0, 0, 240, 68, toHex(THEME.colors.panel)).setStrokeStyle(1, toHex(THEME.colors.border))
+    const transferBtn = this.add.rectangle(-60, 0, 110, 36, toHex(THEME.colors.border))
+      .setStrokeStyle(1, toHex(THEME.colors.secondary))
+      .setInteractive({ useHandCursor: true })
+    const transferLbl = this.add.text(-60, 0, "TRANSFER", { fontFamily: THEME.fonts.header, fontSize: "10px", color: THEME.colors.white }).setOrigin(0.5)
+    const kickBtn = this.add.rectangle(66, 0, 100, 36, 0x2a1a1a)
+      .setStrokeStyle(1, 0x663333)
+      .setInteractive({ useHandCursor: true })
+    const kickLbl = this.add.text(66, 0, "KICK", { fontFamily: THEME.fonts.header, fontSize: "10px", color: "#ff5555" }).setOrigin(0.5)
+
+    transferBtn.on("pointerover", () => transferBtn.setFillStyle(toHex(THEME.colors.secondary)))
+    transferBtn.on("pointerout", () => transferBtn.setFillStyle(toHex(THEME.colors.border)))
+    transferBtn.on("pointerdown", () => {
+      sounds.menuConfirm()
+      sendTransferGamemaster(targetId)
+      this.dismissKickPopup()
+    })
+    kickBtn.on("pointerover", () => kickBtn.setFillStyle(0x441111))
+    kickBtn.on("pointerout", () => kickBtn.setFillStyle(0x2a1a1a))
+    kickBtn.on("pointerdown", () => {
+      sounds.menuConfirm()
+      sendKickPlayer(targetId)
+      this.dismissKickPopup()
+    })
+
+    const nameLabel = this.add.text(0, -24, name.toUpperCase(), { fontFamily: THEME.fonts.header, fontSize: "9px", color: THEME.colors.muted }).setOrigin(0.5)
+    popup.add([bg, nameLabel, transferBtn, transferLbl, kickBtn, kickLbl])
+    popup.setDepth(50)
+    this.kickPopup = popup
+
+    this.input.once("pointerdown", () => this.dismissKickPopup())
+  }
+
+  private dismissKickPopup() {
+    this.kickPopup?.destroy()
+    this.kickPopup = null
   }
 
   private refreshChatCursor() {

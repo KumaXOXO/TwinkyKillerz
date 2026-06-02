@@ -90,8 +90,12 @@ export function sendChat(text: string): void {
   _room?.send("chat", { text })
 }
 
-export function sendGamemasterSettings(maxPlayers?: number, gameMode?: string): void {
-  _room?.send("gamemaster_settings", { maxPlayers, gameMode })
+export function sendGamemasterSettings(maxPlayers?: number, gameMode?: string, isPrivate?: boolean): void {
+  _room?.send("gamemaster_settings", { maxPlayers, gameMode, isPrivate })
+}
+
+export function sendKickPlayer(targetId: string): void {
+  _room?.send("kick_player", { targetId })
 }
 
 export function sendTransferGamemaster(targetId: string): void {

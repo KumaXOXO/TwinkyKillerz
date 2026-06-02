@@ -43,6 +43,11 @@ interface ChatMsg {
 interface GamemasterSettingsMsg {
   maxPlayers?: number
   gameMode?: string
+  isPrivate?: boolean
+}
+
+interface KickPlayerMsg {
+  targetId: string
 }
 
 interface TransferGamemasterMsg {
@@ -95,6 +100,9 @@ export class GameRoom extends Room<GameState> {
       this.handleConnect4Drop(client, msg)
     )
     this.onMessage("select_game", (client, msg) => this.handleSelectGame(client, msg))
+    this.onMessage("kick_player", (client, msg: KickPlayerMsg) =>
+      this.handleKickPlayer(client, msg)
+    )
     try {
       await this.updateRoomMetadata()
     } catch (err) {
@@ -208,6 +216,22 @@ export class GameRoom extends Room<GameState> {
     if (msg.gameMode !== undefined && ["olympiade", "single"].includes(msg.gameMode)) {
       this.state.gameMode = msg.gameMode
     }
+    if (msg.isPrivate !== undefined) {
+      this.state.isPrivate = msg.isPrivate
+      this.updateRoomMetadata().catch(err => console.error("metadata update failed", err))
+    }
+  }
+
+  private handleKickPlayer(client: Client, msg: KickPlayerMsg) {
+    if (this.state.phase !== "lobby") return
+    const kicker = this.state.players.get(client.sessionId)
+    if (!kicker?.isGamemaster) return
+    if (msg.targetId === client.sessionId) return
+    const target = this.clients.find(c => c.sessionId === msg.targetId)
+    if (!target) return
+    this.state.players.delete(msg.targetId)
+    target.leave(4000)
+    this.updateRoomMetadata().catch(err => console.error("metadata update failed", err))
   }
 
   private handleTransferGamemaster(client: Client, msg: TransferGamemasterMsg) {

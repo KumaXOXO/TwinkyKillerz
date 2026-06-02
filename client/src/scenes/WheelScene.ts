@@ -33,7 +33,7 @@ export class WheelScene extends Phaser.Scene {
   private resultText!: Phaser.GameObjects.Text
   private inPlacementPhase = false
   private chipSidebarTexts: Map<string, Phaser.GameObjects.Text> = new Map()
-  private _brakeHitZone: Phaser.GameObjects.Arc | null = null
+  private _brakeHitZone: Phaser.GameObjects.Arc | Phaser.GameObjects.Rectangle | null = null
   private arrowSprite!: Phaser.GameObjects.Graphics
 
   constructor() {
@@ -274,35 +274,60 @@ export class WheelScene extends Phaser.Scene {
 
   private buildPlacementUI() {
     const me = this.room.state.players.get(this.room.sessionId)
+    const { width, height } = this.scale
+
+    // Pulse wheel during placement
+    this.tweens.killTweensOf(this.wheelContainer)
+    this.tweens.add({
+      targets: this.wheelContainer,
+      scaleX: 1.04, scaleY: 1.04,
+      duration: 600, yoyo: true, repeat: -1,
+      ease: "Sine.easeInOut"
+    })
+
     if (!me || me.chips <= 0) {
-      this.statusText.setText("WAITING FOR INPUT...")
+      this.statusText.setText("WAITING FOR OTHERS...")
       this.chipsText.setText("")
       return
     }
 
     const myChips = me.chips
-    const { width, height } = this.scale
-
-    this.statusText.setText("ALLOCATE RESOURCES TO SEGMENTS")
-    this.chipsText.setText(`AVAILABLE: ${myChips}`)
+    this.statusText.setText("PLACE YOUR CHIPS")
+    this.chipsText.setText(`CHIPS: ${myChips}`)
 
     const games = [...MINIGAMES] as string[]
-    const startY = height / 2 + RADIUS + 138
+    const cols = games.length
+    const btnW = Math.min(120, (width - 40) / cols)
+    const startX = width / 2 - ((cols - 1) / 2) * (btnW + 8)
+
     games.forEach((game, idx) => {
-      const chips = this.room.state.olympiade.wheel.fields.get(game)?.fixedChips ?? 0
-      const line = `[${idx + 1}] ${game.toUpperCase()} (${chips})`
-      const t = this.add
-        .text(width / 2, startY + idx * 24, line, {
-          fontFamily: THEME.fonts.header,
-          fontSize: "14px",
-          color: THEME.colors.white
-        })
-        .setOrigin(0.5)
+      const bx = startX + idx * (btnW + 8)
+      const by = height / 2 + RADIUS + 55
+
+      const chipCount = this.room.state.olympiade.wheel.fields.get(game)?.fixedChips ?? 0
+
+      const bg = this.add.rectangle(bx, by, btnW, 44, toHex(THEME.colors.panel))
+        .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
-      t.on("pointerover", () => t.setColor(THEME.colors.primary))
-      t.on("pointerout", () => t.setColor(THEME.colors.white))
-      t.on("pointerdown", () => sendPlaceChip(idx))
-      this.placementTexts.push(t)
+        .setDepth(5)
+      const lbl = this.add.text(bx, by - 6, game.toUpperCase(), {
+        fontFamily: THEME.fonts.header, fontSize: "9px", color: THEME.colors.muted
+      }).setOrigin(0.5).setDepth(6)
+      const cnt = this.add.text(bx, by + 9, `${chipCount}`, {
+        fontFamily: THEME.fonts.header, fontSize: "14px", color: THEME.colors.warning
+      }).setOrigin(0.5).setDepth(6)
+
+      bg.on("pointerover", () => bg.setFillStyle(0x2a1a4e))
+      bg.on("pointerout", () => bg.setFillStyle(toHex(THEME.colors.panel)))
+      bg.on("pointerdown", () => {
+        sendPlaceChip(idx)
+        this.tweens.add({ targets: bg, scaleX: 0.9, scaleY: 0.9, duration: 60, yoyo: true })
+      })
+
+      bg.setScale(0); lbl.setScale(0); cnt.setScale(0)
+      this.tweens.add({ targets: [bg, lbl, cnt], scale: 1, duration: 200, delay: idx * 40, ease: "Back.easeOut" })
+
+      this.placementTexts.push(bg as unknown as Phaser.GameObjects.Text, lbl, cnt)
 
       const handler = () => sendPlaceChip(idx)
       this.placementKeyHandlers[idx] = handler
@@ -311,6 +336,8 @@ export class WheelScene extends Phaser.Scene {
   }
 
   private clearPlacementUI() {
+    this.tweens.killTweensOf(this.wheelContainer)
+    this.wheelContainer.setScale(1)
     for (const t of this.placementTexts) t.destroy()
     this.placementTexts = []
     const games = [...MINIGAMES] as string[]
@@ -323,21 +350,16 @@ export class WheelScene extends Phaser.Scene {
 
   private refreshPlacementUI() {
     const myChips = this.room.state.players.get(this.room.sessionId)?.chips ?? 0
+
+    this.chipsText?.setText(myChips > 0 ? `CHIPS: ${myChips}` : "")
+    this.statusText?.setText(myChips > 0 ? "PLACE YOUR CHIPS" : "WAITING FOR OTHERS...")
+
+    // Update chip counts on segment buttons (every 3rd object = cnt text)
     const games = [...MINIGAMES] as string[]
-
-    this.chipsText?.setText(
-      myChips > 0 ? `AVAILABLE: ${myChips}` : "",
-    )
-    this.statusText?.setText(
-      myChips > 0 ? "ALLOCATE RESOURCES TO SEGMENTS" : "WAITING FOR INPUT...",
-    )
-
     games.forEach((game, idx) => {
       const chips = this.room.state.olympiade.wheel.fields.get(game)?.fixedChips ?? 0
-      const t = this.placementTexts[idx]
-      if (!t) return
-      const prefix = myChips > 0 ? `[${idx + 1}] ` : ""
-      t.setText(`${prefix}${game.toUpperCase()} (${chips})`)
+      const cnt = this.placementTexts[idx * 3 + 2] as Phaser.GameObjects.Text | undefined
+      cnt?.setText?.(`${chips}`)
     })
   }
 
@@ -347,42 +369,56 @@ export class WheelScene extends Phaser.Scene {
     const isSpinner = this.room.state.olympiade.wheel.spinnerId === this.room.sessionId
 
     this.statusText?.setText(
-      isSpinner ? "PRESS [SPACE] TO EXECUTE" : `WAITING FOR ${spinnerName.toUpperCase()}`,
+      isSpinner ? "PRESS [SPACE] TO SPIN" : `WAITING FOR ${spinnerName.toUpperCase()}`,
     )
-    this.timerText?.setText(isSpinner ? "← → / CLICK TO BRAKE" : "")
+    this.timerText?.setText("")
     this.chipsText?.setText("")
 
-    if (isSpinner) {
-      this.spaceHandler = () => {
-        const v = this.room.state.olympiade.wheel.velocity
-        if (v <= 0) return
-        this.velocity = v
-        this.isSpinning = true
-        this.timerText?.setText("← → / CLICK TO BRAKE")
-      }
-      this.input.keyboard!.once("keydown-SPACE", this.spaceHandler)
-      const { width, height } = this.scale
-      const hitZone = this.add
-        .circle(width / 2, height / 2, RADIUS, 0xffffff, 0)
-        .setInteractive({ useHandCursor: true })
-        .setDepth(20)
-      hitZone.on("pointerdown", () => {
-        if (!this.isSpinning || this.isDone) return
-        this.decelMult = Math.min(
-          1 + WHEEL_ARROW_INFLUENCE * 4,
-          this.decelMult + WHEEL_ARROW_INFLUENCE * 2,
-        )
-        this.tweens.add({
-          targets: this.wheelContainer,
-          scaleX: 0.95,
-          scaleY: 0.95,
-          duration: 80,
-          yoyo: true,
-          ease: "Cubic.easeOut",
-        })
-      })
-      this._brakeHitZone = hitZone
+    if (!isSpinner) return
+
+    const { width, height } = this.scale
+    const cx = width / 2
+    const cy = height / 2
+
+    // Left half = brake zone (invisible rectangle)
+    const brakeZone = this.add
+      .rectangle(cx - RADIUS / 2, cy, RADIUS, RADIUS * 2, 0xffffff, 0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(20)
+    brakeZone.on("pointerdown", () => {
+      if (!this.isSpinning || this.isDone) return
+      this.decelMult = Math.min(1 + WHEEL_ARROW_INFLUENCE * 4, this.decelMult + WHEEL_ARROW_INFLUENCE * 2)
+      this.tweens.add({ targets: this.wheelContainer, scaleX: 0.95, scaleY: 0.95, duration: 80, yoyo: true, ease: "Cubic.easeOut" })
+    })
+
+    // Right half = slight accelerate zone
+    const accelZone = this.add
+      .rectangle(cx + RADIUS / 2, cy, RADIUS, RADIUS * 2, 0xffffff, 0)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(20)
+    accelZone.on("pointerdown", () => {
+      if (!this.isSpinning || this.isDone) return
+      this.decelMult = Math.max(1 - WHEEL_ARROW_INFLUENCE, this.decelMult - WHEEL_ARROW_INFLUENCE * 0.5)
+    })
+
+    // Labels visible only to spinner
+    const brakeLabel = this.add.text(cx - RADIUS - 10, cy, "◄ BRAKE", {
+      fontFamily: THEME.fonts.body, fontSize: "14px", color: THEME.colors.primary
+    }).setOrigin(1, 0.5).setDepth(20).setAlpha(0)
+    const accelLabel = this.add.text(cx + RADIUS + 10, cy, "BOOST ►", {
+      fontFamily: THEME.fonts.body, fontSize: "14px", color: THEME.colors.warning
+    }).setOrigin(0, 0.5).setDepth(20).setAlpha(0)
+
+    this._brakeHitZone = brakeZone
+
+    this.spaceHandler = () => {
+      const v = this.room.state.olympiade.wheel.velocity
+      if (v <= 0) return
+      this.velocity = v
+      this.isSpinning = true
+      this.tweens.add({ targets: [brakeLabel, accelLabel], alpha: 1, duration: 300 })
     }
+    this.input.keyboard!.once("keydown-SPACE", this.spaceHandler)
   }
 
   private buildWheel() {
