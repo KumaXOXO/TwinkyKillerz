@@ -5,7 +5,7 @@ import { joinByCode, getPublicLobbies, joinLobbyById, type LobbyInfo } from "../
 import { THEME, toHex } from "../utils/Theme"
 import { UIFactory } from "../utils/UIFactory"
 
-const VERSION = "v0.5.1-MODULAR"
+const VERSION = "v0.5.2-MODULAR"
 
 export class CharacterSelectScene extends Phaser.Scene {
   private typedName = ""
@@ -34,10 +34,10 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   preload() {
-    // Slicing based on pixel analysis: 80px wide frames, 192px row height
-    this.load.spritesheet('char_main', 'assets/Gemini_Generated_Image_qhrnp3qhrnp3qhrn.png', { frameWidth: 80, frameHeight: 192 });
-    this.load.spritesheet('char_robin', 'assets/Gemini_Generated_Image_m0w3i8m0w3i8m0w3.png', { frameWidth: 80, frameHeight: 192 });
-    this.load.spritesheet('char_ingo', 'assets/Gemini_Generated_Image_5pmfmo5pmfmo5pmf.png', { frameWidth: 80, frameHeight: 192 });
+    // Each character has their own individual spritesheet
+    CHARACTERS.forEach(ch => {
+      this.load.spritesheet(ch.asset, `assets/${ch.asset}.png`, { frameWidth: ch.fw, frameHeight: ch.fh });
+    });
   }
 
   create() {
@@ -45,11 +45,11 @@ export class CharacterSelectScene extends Phaser.Scene {
     sounds.resume()
     this.cameras.main.setPostPipeline('CRTPipeline')
 
-    // Setup Animations (4 frames for run cycle)
+    // Setup Animations (using first row frames 0-3 for idle/run)
     CHARACTERS.forEach((ch) => {
       this.anims.create({
         key: `anim_${ch.id}`,
-        frames: this.anims.generateFrameNumbers(ch.asset, { start: ch.startFrame, end: ch.startFrame + 3 }),
+        frames: this.anims.generateFrameNumbers(ch.asset, { start: 0, end: 3 }),
         frameRate: 10,
         repeat: -1
       });
@@ -76,19 +76,24 @@ export class CharacterSelectScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     // Modular Character Grid
-    const CARD_W = 140
+    const CARD_W = 160
     const CARD_H = 180
-    const GAP = 15
+    const GAP = 20
     const MAX_COLS = 4
-    const cols = Math.min(CHARACTERS.length, MAX_COLS)
-    const gridWidth = cols * CARD_W + (cols - 1) * GAP
-    const startX = (width - gridWidth) / 2 + CARD_W / 2
-    const startY = 240
+    const totalChars = CHARACTERS.length
+    const rows = Math.ceil(totalChars / MAX_COLS)
+    const startY = 230
 
     CHARACTERS.forEach((ch, i) => {
       const col = i % MAX_COLS
       const row = Math.floor(i / MAX_COLS)
-      const cx = startX + col * (CARD_W + GAP)
+
+      // Calculate startX for this row to center it
+      const rowSize = (row === rows - 1) ? (totalChars % MAX_COLS || MAX_COLS) : MAX_COLS
+      const rowWidth = rowSize * CARD_W + (rowSize - 1) * GAP
+      const rowStartX = (width - rowWidth) / 2 + CARD_W / 2
+
+      const cx = rowStartX + col * (CARD_W + GAP)
       const cy = startY + row * (CARD_H + GAP)
 
       const container = this.add.container(cx, cy)
@@ -96,12 +101,12 @@ export class CharacterSelectScene extends Phaser.Scene {
         .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
 
-      // Sprite - scaled up because pixel art is small
-      const sprite = this.add.sprite(0, -10, ch.asset, ch.startFrame).setScale(1.2)
+      // Individual Sprite - scaled down for UI cards
+      const sprite = this.add.sprite(0, -15, ch.asset, 0).setScale(0.25)
 
       const name = this.add.text(0, 65, ch.name.toUpperCase(), {
         fontFamily: THEME.fonts.header,
-        fontSize: "9px",
+        fontSize: "8px",
         color: ch.color,
         align: 'center',
         wordWrap: { width: CARD_W - 20 }
@@ -121,11 +126,11 @@ export class CharacterSelectScene extends Phaser.Scene {
       bg.on("pointerover", () => {
         this.tweens.add({
           targets: container,
-          scale: 1.08,
+          scale: 1.1,
           duration: 150,
           ease: 'Power2'
         })
-        bg.setFillStyle(0xffffff, 0.2) // White glow
+        bg.setFillStyle(0xffffff, 0.4) // Strong white glow
         bg.setStrokeStyle(3, 0xffffff)
         sprite.play(`anim_${ch.id}`)
       })
@@ -142,7 +147,7 @@ export class CharacterSelectScene extends Phaser.Scene {
           bg.setFillStyle(toHex(THEME.colors.panel))
           bg.setStrokeStyle(2, toHex(THEME.colors.border))
           sprite.stop()
-          sprite.setFrame(ch.startFrame)
+          sprite.setFrame(0)
         } else {
           bg.setFillStyle(0x2a1a4e)
           bg.setStrokeStyle(2, toHex(THEME.colors.primary))
@@ -229,6 +234,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     } else if (event.key === "ArrowUp") {
       const MAX_COLS = 4
       this.selectedIdx = (this.selectedIdx - MAX_COLS + CHARACTERS.length) % CHARACTERS.length
+      if (this.selectedIdx < 0) this.selectedIdx += CHARACTERS.length
       sounds.menuNav()
       this.refreshSelection()
     } else if (event.key === "ArrowDown") {
@@ -277,7 +283,7 @@ export class CharacterSelectScene extends Phaser.Scene {
           ease: 'Power1'
         })
         sprite.stop()
-        sprite.setFrame(ch.startFrame)
+        sprite.setFrame(0)
       }
     })
   }
