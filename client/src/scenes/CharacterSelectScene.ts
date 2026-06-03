@@ -122,8 +122,10 @@ export class CharacterSelectScene extends Phaser.Scene {
         .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
 
-      // Individual Sprite
-      const sprite = this.add.sprite(0, -15, ch.asset, 0).setScale(0.25)
+      // Individual Sprite — scale to fixed display height so different fh values fit
+      const TARGET_H = 130
+      const baseScale = TARGET_H / ch.fh
+      const sprite = this.add.sprite(0, -15, ch.asset, 0).setScale(baseScale)
 
       const name = this.add.text(0, 65, ch.name.toUpperCase(), {
         fontFamily: THEME.fonts.body,
@@ -143,8 +145,8 @@ export class CharacterSelectScene extends Phaser.Scene {
       sprite.play(`anim_${ch.id}`)
       this.tweens.add({
         targets: sprite,
-        scaleX: 0.255,
-        scaleY: 0.255,
+        scaleX: baseScale * 1.02,
+        scaleY: baseScale * 1.02,
         duration: 2000 + i * 150,
         yoyo: true,
         repeat: -1,

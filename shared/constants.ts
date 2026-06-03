@@ -73,9 +73,9 @@ export const CHESS_PIECE_SYMBOLS: Record<string, string> = {
 export const CHESS_TURN_MS = 30_000
 
 export const CHARACTERS = [
-  { id: "lucas", name: "Blonde Podcaster", color: "#ff006e", asset: "blond_podcaster", fw: 342, fh: 574, symbol: "🧶" },
+  { id: "lucas", name: "Blonde Podcaster", color: "#ff006e", asset: "blond_podcaster", fw: 271, fh: 724, symbol: "🧶" },
   { id: "fedor", name: "Geek Streamr", color: "#3a86ff", asset: "geek_streamer", fw: 418, fh: 470, symbol: "🧠" },
-  { id: "christian", name: "Bearded Gamer", color: "#8338ec", asset: "bearded_gamer", fw: 350, fh: 561, symbol: "🧔" },
+  { id: "christian", name: "Bearded Gamer", color: "#8338ec", asset: "bearded_gamer", fw: 271, fh: 724, symbol: "🧔" },
   { id: "dodo", name: "Lockiger zuschauer", color: "#ffffff", asset: "lockiger_zuschauer", fw: 384, fh: 512, symbol: "⚡" },
   { id: "grhost", name: "Grinsender CO-Host", color: "#00f5d4", asset: "grinsender_co_host", fw: 418, fh: 470, symbol: "🎧" },
   { id: "robin", name: "Robin Reinhardt", color: "#ffbe0b", asset: "robin", fw: 418, fh: 470, symbol: "🏹" },
