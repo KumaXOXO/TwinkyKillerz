@@ -5,7 +5,7 @@ import { joinByCode, getPublicLobbies, joinLobbyById, type LobbyInfo } from "../
 import { THEME, toHex } from "../utils/Theme"
 import { UIFactory } from "../utils/UIFactory"
 
-const VERSION = "v0.5.2-MODULAR"
+const VERSION = "v0.5.3-STABLE"
 
 export class CharacterSelectScene extends Phaser.Scene {
   private typedName = ""
@@ -34,10 +34,15 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   preload() {
-    // Each character has their own individual spritesheet
-    CHARACTERS.forEach(ch => {
-      this.load.spritesheet(ch.asset, `assets/${ch.asset}.png`, { frameWidth: ch.fw, frameHeight: ch.fh });
-    });
+    // Exact slicing based on Node dimension check (Width/4, Height/2)
+    this.load.spritesheet('blond_podcaster', 'assets/blond_podcaster.png', { frameWidth: 342, frameHeight: 574 });
+    this.load.spritesheet('geek_streamer', 'assets/geek_streamer.png', { frameWidth: 418, frameHeight: 470 });
+    this.load.spritesheet('bearded_gamer', 'assets/bearded_gamer.png', { frameWidth: 350, frameHeight: 561 });
+    this.load.spritesheet('lockiger_zuschauer', 'assets/lockiger_zuschauer.png', { frameWidth: 384, frameHeight: 512 });
+    this.load.spritesheet('grinsender_co_host', 'assets/grinsender_co_host.png', { frameWidth: 418, frameHeight: 470 });
+    this.load.spritesheet('robin', 'assets/robin.png', { frameWidth: 418, frameHeight: 470 });
+    this.load.spritesheet('ingo_p', 'assets/ingo_p.png', { frameWidth: 350, frameHeight: 561 });
+    this.load.spritesheet('ingo_p_w', 'assets/ingo_p_w.png', { frameWidth: 418, frameHeight: 470 });
   }
 
   create() {
@@ -45,71 +50,93 @@ export class CharacterSelectScene extends Phaser.Scene {
     sounds.resume()
     this.cameras.main.setPostPipeline('CRTPipeline')
 
-    // Setup Animations (using first row frames 0-3 for idle/run)
+    // Setup Animations
     CHARACTERS.forEach((ch) => {
       this.anims.create({
         key: `anim_${ch.id}`,
         frames: this.anims.generateFrameNumbers(ch.asset, { start: 0, end: 3 }),
-        frameRate: 10,
+        frameRate: 8,
         repeat: -1
       });
     });
 
-    UIFactory.createHeader(this, width / 2, 40, "IDENTITY SELECTION")
+    // Back to old font style for header
+    this.add.text(width / 2, 40, "TWINKY GAMES", {
+        fontSize: "38px",
+        color: THEME.colors.text,
+        fontStyle: "bold"
+    }).setOrigin(0.5);
 
     this.add
-      .text(width / 2, 75, "AUTHORIZED PERSONNEL ONLY", {
+      .text(width / 2, 88, "Choose your character", {
         fontFamily: THEME.fonts.body,
-        fontSize: "16px",
+        fontSize: "20px",
         color: THEME.colors.muted
       })
       .setOrigin(0.5)
 
+    this.add
+      .text(width - 8, height - 8, VERSION, {
+        fontFamily: THEME.fonts.body,
+        fontSize: "12px",
+        color: THEME.colors.muted
+      })
+      .setOrigin(1, 1)
+
     // Name input box
-    this.add.rectangle(width / 2, 120, 320, 40, toHex(THEME.colors.black)).setStrokeStyle(2, toHex(THEME.colors.border))
-    this.nameText = this.add
-      .text(width / 2, 120, "", {
-        fontFamily: THEME.fonts.header,
+    this.add
+      .text(width / 2, 140, "SELECT YOUR NAME", {
+        fontFamily: THEME.fonts.body,
         fontSize: "18px",
+        color: THEME.colors.muted
+      })
+      .setOrigin(0.5)
+
+    this.add.rectangle(width / 2, 178, 300, 44, toHex(THEME.colors.black)).setStrokeStyle(2, toHex(THEME.colors.border))
+    this.nameText = this.add
+      .text(width / 2, 178, "", {
+        fontFamily: THEME.fonts.header,
+        fontSize: "20px",
         color: THEME.colors.white
       })
       .setOrigin(0.5)
 
     // Modular Character Grid
-    const CARD_W = 160
-    const CARD_H = 180
-    const GAP = 20
-    const MAX_COLS = 4
+    const CARD_W = 180
+    const CARD_H = 140
+    const GAP = 15
+    const MAX_COLS = 3
     const totalChars = CHARACTERS.length
     const rows = Math.ceil(totalChars / MAX_COLS)
-    const startY = 230
+    const startY = 220
 
     CHARACTERS.forEach((ch, i) => {
       const col = i % MAX_COLS
       const row = Math.floor(i / MAX_COLS)
 
-      // Calculate startX for this row to center it
+      // Center the grid row
       const rowSize = (row === rows - 1) ? (totalChars % MAX_COLS || MAX_COLS) : MAX_COLS
       const rowWidth = rowSize * CARD_W + (rowSize - 1) * GAP
       const rowStartX = (width - rowWidth) / 2 + CARD_W / 2
 
       const cx = rowStartX + col * (CARD_W + GAP)
-      const cy = startY + row * (CARD_H + GAP)
+      const cy = startY + row * (CARD_H + GAP) + CARD_H / 2
 
       const container = this.add.container(cx, cy)
       const bg = this.add.rectangle(0, 0, CARD_W, CARD_H, toHex(THEME.colors.panel))
         .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
 
-      // Individual Sprite - scaled down for UI cards
-      const sprite = this.add.sprite(0, -15, ch.asset, 0).setScale(0.25)
+      // Individual Sprite - Scale 0.2 because they are HUGE
+      const sprite = this.add.sprite(0, -15, ch.asset, 0).setScale(0.2)
 
-      const name = this.add.text(0, 65, ch.name.toUpperCase(), {
-        fontFamily: THEME.fonts.header,
-        fontSize: "8px",
+      const name = this.add.text(0, 50, ch.name.toUpperCase(), {
+        fontFamily: THEME.fonts.body, // Cleaner font for readability
+        fontSize: "14px",
         color: ch.color,
+        fontStyle: 'bold',
         align: 'center',
-        wordWrap: { width: CARD_W - 20 }
+        wordWrap: { width: CARD_W - 10 }
       }).setOrigin(0.5)
 
       container.add([bg, sprite, name])
@@ -130,7 +157,7 @@ export class CharacterSelectScene extends Phaser.Scene {
           duration: 150,
           ease: 'Power2'
         })
-        bg.setFillStyle(0xffffff, 0.4) // Strong white glow
+        bg.setFillStyle(0xffffff, 0.4) // White glow
         bg.setStrokeStyle(3, 0xffffff)
         sprite.play(`anim_${ch.id}`)
       })
@@ -153,26 +180,16 @@ export class CharacterSelectScene extends Phaser.Scene {
           bg.setStrokeStyle(2, toHex(THEME.colors.primary))
         }
       })
-
-      // Idle float
-      this.tweens.add({
-        targets: container,
-        y: cy - 3,
-        duration: 2000 + Math.random() * 1000,
-        ease: 'Sine.easeInOut',
-        yoyo: true,
-        loop: -1
-      })
     })
 
-    const btnY = height - 50
-    this.createBtn = UIFactory.createButton(this, width / 2 - 130, btnY, 240, 40, "CREATE ROOM", () => {
+    const btnY = height - 62
+    this.createBtn = UIFactory.createButton(this, width / 2 - 110, btnY, 190, 44, "CREATE ROOM", () => {
       if (!this.typedName.trim()) return
       sounds.menuConfirm()
       this.showCreateDialog()
     })
 
-    this.joinBtn = UIFactory.createButton(this, width / 2 + 130, btnY, 240, 40, "JOIN WITH CODE", () => {
+    this.joinBtn = UIFactory.createButton(this, width / 2 + 110, btnY, 190, 44, "JOIN WITH CODE", () => {
       if (!this.typedName.trim()) return
       sounds.menuNav()
       this.showCodeInput()
@@ -232,13 +249,13 @@ export class CharacterSelectScene extends Phaser.Scene {
       sounds.menuNav()
       this.refreshSelection()
     } else if (event.key === "ArrowUp") {
-      const MAX_COLS = 4
+      const MAX_COLS = 3
       this.selectedIdx = (this.selectedIdx - MAX_COLS + CHARACTERS.length) % CHARACTERS.length
       if (this.selectedIdx < 0) this.selectedIdx += CHARACTERS.length
       sounds.menuNav()
       this.refreshSelection()
     } else if (event.key === "ArrowDown") {
-      const MAX_COLS = 4
+      const MAX_COLS = 3
       this.selectedIdx = (this.selectedIdx + MAX_COLS) % CHARACTERS.length
       sounds.menuNav()
       this.refreshSelection()
