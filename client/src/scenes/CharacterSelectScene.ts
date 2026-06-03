@@ -49,8 +49,8 @@ export class CharacterSelectScene extends Phaser.Scene {
     CHARACTERS.forEach((ch) => {
       this.anims.create({
         key: `anim_${ch.id}`,
-        frames: this.anims.generateFrameNumbers(ch.asset, { start: 0, end: 3 }),
-        frameRate: 8,
+        frames: this.anims.generateFrameNumbers(ch.asset, { start: 0, end: 7 }),
+        frameRate: 4,
         repeat: -1
       });
     });
@@ -139,6 +139,19 @@ export class CharacterSelectScene extends Phaser.Scene {
       this.cardBgs.push(bg)
       this.characterSprites.push(sprite)
 
+      // Idle always playing — staggered breathing scale so chars stay centered
+      sprite.play(`anim_${ch.id}`)
+      this.tweens.add({
+        targets: sprite,
+        scaleX: 0.255,
+        scaleY: 0.255,
+        duration: 2000 + i * 150,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        delay: i * 300
+      })
+
       bg.on("pointerdown", () => {
         this.selectedIdx = i
         sounds.menuNav()
@@ -154,7 +167,6 @@ export class CharacterSelectScene extends Phaser.Scene {
         })
         bg.setFillStyle(0xffffff, 0.4) // Strong white glow
         bg.setStrokeStyle(3, 0xffffff)
-        sprite.play(`anim_${ch.id}`)
       })
 
       bg.on("pointerout", () => {
@@ -168,8 +180,6 @@ export class CharacterSelectScene extends Phaser.Scene {
         if (!isSelected) {
           bg.setFillStyle(toHex(THEME.colors.panel))
           bg.setStrokeStyle(2, toHex(THEME.colors.border))
-          sprite.stop()
-          sprite.setFrame(0)
         } else {
           bg.setFillStyle(0x2a1a4e)
           bg.setStrokeStyle(2, toHex(THEME.colors.primary))
@@ -286,7 +296,6 @@ export class CharacterSelectScene extends Phaser.Scene {
           duration: 200,
           ease: 'Back.easeOut'
         })
-        sprite.play(`anim_${ch.id}`)
       } else {
         this.tweens.add({
           targets: container,
@@ -294,8 +303,6 @@ export class CharacterSelectScene extends Phaser.Scene {
           duration: 200,
           ease: 'Power1'
         })
-        sprite.stop()
-        sprite.setFrame(0)
       }
     })
   }
