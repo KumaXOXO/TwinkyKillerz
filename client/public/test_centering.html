@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        body { background: #0d0221; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { 
+            width: 180px; height: 220px; 
+            border: 2px solid #3a2a6e; 
+            background: #16162a; 
+            display: flex; flex-direction: column; align-items: center; 
+            transition: 0.2s;
+        }
+        .card:hover { 
+            background: rgba(255,255,255,0.4); 
+            border-color: #fff; 
+            box-shadow: 0 0 30px #fff; 
+            transform: scale(1.1);
+        }
+        .sprite-placeholder { 
+            width: 100px; height: 120px; 
+            background: #333; 
+            margin-top: 20px;
+            display: flex; justify-content: center; align-items: center;
+            color: #555; font-weight: bold;
+        }
+        .name { 
+            font-family: 'VT323', monospace; 
+            font-size: 24px; 
+            color: #ff006e; 
+            margin-top: 15px;
+            text-shadow: 2px 2px 0px #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="sprite-placeholder">SPRITE</div>
+        <div class="name">Blonde Podcaster</div>
+    </div>
+</body>
+</html>

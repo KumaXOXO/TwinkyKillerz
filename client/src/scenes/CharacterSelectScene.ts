@@ -35,14 +35,9 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   preload() {
     // Exact slicing based on Node dimension check (Width/4, Height/2)
-    this.load.spritesheet('blond_podcaster', 'assets/blond_podcaster.png', { frameWidth: 342, frameHeight: 574 });
-    this.load.spritesheet('geek_streamer', 'assets/geek_streamer.png', { frameWidth: 418, frameHeight: 470 });
-    this.load.spritesheet('bearded_gamer', 'assets/bearded_gamer.png', { frameWidth: 350, frameHeight: 561 });
-    this.load.spritesheet('lockiger_zuschauer', 'assets/lockiger_zuschauer.png', { frameWidth: 384, frameHeight: 512 });
-    this.load.spritesheet('grinsender_co_host', 'assets/grinsender_co_host.png', { frameWidth: 418, frameHeight: 470 });
-    this.load.spritesheet('robin', 'assets/robin.png', { frameWidth: 418, frameHeight: 470 });
-    this.load.spritesheet('ingo_p', 'assets/ingo_p.png', { frameWidth: 350, frameHeight: 561 });
-    this.load.spritesheet('ingo_p_w', 'assets/ingo_p_w.png', { frameWidth: 418, frameHeight: 470 });
+    CHARACTERS.forEach(ch => {
+      this.load.spritesheet(ch.asset, `assets/${ch.asset}.png`, { frameWidth: ch.fw, frameHeight: ch.fh });
+    });
   }
 
   create() {
@@ -60,7 +55,7 @@ export class CharacterSelectScene extends Phaser.Scene {
       });
     });
 
-    // Back to old font style for header
+    // Old style header
     this.add.text(width / 2, 40, "TWINKY GAMES", {
         fontSize: "38px",
         color: THEME.colors.text,
@@ -103,8 +98,8 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     // Modular Character Grid
     const CARD_W = 180
-    const CARD_H = 140
-    const GAP = 15
+    const CARD_H = 180
+    const GAP = 20
     const MAX_COLS = 3
     const totalChars = CHARACTERS.length
     const rows = Math.ceil(totalChars / MAX_COLS)
@@ -127,12 +122,12 @@ export class CharacterSelectScene extends Phaser.Scene {
         .setStrokeStyle(2, toHex(THEME.colors.border))
         .setInteractive({ useHandCursor: true })
 
-      // Individual Sprite - Scale 0.2 because they are HUGE
-      const sprite = this.add.sprite(0, -15, ch.asset, 0).setScale(0.2)
+      // Individual Sprite
+      const sprite = this.add.sprite(0, -15, ch.asset, 0).setScale(0.25)
 
-      const name = this.add.text(0, 50, ch.name.toUpperCase(), {
-        fontFamily: THEME.fonts.body, // Cleaner font for readability
-        fontSize: "14px",
+      const name = this.add.text(0, 65, ch.name.toUpperCase(), {
+        fontFamily: THEME.fonts.body,
+        fontSize: "24px", // Increased size
         color: ch.color,
         fontStyle: 'bold',
         align: 'center',
@@ -157,7 +152,7 @@ export class CharacterSelectScene extends Phaser.Scene {
           duration: 150,
           ease: 'Power2'
         })
-        bg.setFillStyle(0xffffff, 0.4) // White glow
+        bg.setFillStyle(0xffffff, 0.4) // Strong white glow
         bg.setStrokeStyle(3, 0xffffff)
         sprite.play(`anim_${ch.id}`)
       })
